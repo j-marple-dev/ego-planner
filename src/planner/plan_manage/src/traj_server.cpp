@@ -8,6 +8,7 @@
 #include <std_msgs/String.h>
 
 #include <mavros_msgs/PositionTarget.h>
+#include <mavros_msgs/State.h>
 #include <nav_msgs/Path.h>
 #include <tf/tf.h>
 
@@ -38,6 +39,8 @@ double last_yaw_, last_yaw_dot_;
 double time_forward_;
 bool use_velocity_control_, enable_rotate_head_;
 double forward_length_;
+
+mavros_msgs::State current_state;
 
 void bsplineCallback(ego_planner::BsplineConstPtr msg)
 {
@@ -257,7 +260,6 @@ void cmdCallback(const ros::TimerEvent &e)
 
   } else {
     msg.type_mask |= msg.IGNORE_VX | msg.IGNORE_VY | msg.IGNORE_VZ;
-    last_yaw_ = odom_yaw_;
 
     Eigen::Vector3d waypoint_pose(control_.position.x, control_.position.y, 0);
 
@@ -275,6 +277,7 @@ void cmdCallback(const ros::TimerEvent &e)
     if (abs(waypoint_yaw) > 0.1) {
       msg.type_mask |= msg.IGNORE_YAW;
       msg.yaw_rate = waypoint_yaw;
+      last_yaw_ = odom_yaw_;
     } else {
       msg.type_mask |= msg.IGNORE_YAW_RATE;
       msg.yaw = last_yaw_;
@@ -296,11 +299,29 @@ void odom_callback(const nav_msgs::Odometry::ConstPtr& msg) {
 
   odom_yaw_ = getYaw(msg->pose.pose.orientation);
 
-  if (!have_odom_) {
+  if (!have_odom_ || current_state.mode != "OFFBOARD") {
     have_odom_ = true;
     last_odom_pos_ = odom_pos_;
     last_yaw_ = odom_yaw_;
   }
+}
+
+void state_callback(const mavros_msgs::State::ConstPtr& msg){
+  auto prev_mode = current_state.mode;
+  auto curr_mode = msg->mode;
+
+  if (prev_mode != curr_mode) { // mode change trigger
+    if (curr_mode == "OFFBOARD") { // change to offboard
+
+    } else if (prev_mode == "OFFBOARD") { // change to another mode
+      receive_traj_ = false;
+
+    } else {
+
+    }
+  }
+
+  current_state = *msg;
 }
 
 void controlCallback(const geometry_msgs::PoseConstPtr &msg) {
@@ -317,6 +338,7 @@ int main(int argc, char **argv)
   ros::Subscriber trajlist_sub = node.subscribe("/ego_planner_node/traj_list", 10, customTrajCallback);
   ros::Subscriber odom_sub = node.subscribe("/odom_world", 10, odom_callback);
   ros::Subscriber waypoint_sub = node.subscribe("/waypoint_generator/waypoint_manual", 10, controlCallback);
+  ros::Subscriber state_sub = node.subscribe("/mavros/state", 10, state_callback);
 
   pos_cmd_pub = node.advertise<quadrotor_msgs::PositionCommand>("/position_cmd", 50);
   setpoint_raw_pub = node.advertise<mavros_msgs::PositionTarget>("/mavros/setpoint_raw/local", 1);

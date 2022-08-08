@@ -12,6 +12,7 @@
 #include <deque>
 #include <boost/format.hpp>
 #include <eigen3/Eigen/Dense>
+#include <mavros_msgs/State.h>
 
 using namespace std;
 using bfmt = boost::format;
@@ -36,6 +37,9 @@ struct rc_input_t {
     double yawrate;
     double throttle;
 } rc_input;
+
+bool is_state_ready = false;
+mavros_msgs::State current_state;
 
 inline double getYaw(const geometry_msgs::Quaternion& q) {
     tf::Quaternion bt = tf::Quaternion(q.x, q.y, q.z, q.w).normalized();
@@ -288,6 +292,8 @@ void rc_demo_callback(const std_msgs::String& msg) {
 }
 
 void rc_input_to_waypoint(const ros::TimerEvent &e) {
+    if (is_state_ready && current_state.mode != "OFFBOARD") return;
+
     // publish control state
     geometry_msgs::Pose pt;
     pt.position.x = rc_input.pitch;
@@ -304,6 +310,11 @@ void rc_input_to_waypoint(const ros::TimerEvent &e) {
     publish_waypoint_manual(pt);
 }
 
+void state_callback(const mavros_msgs::State::ConstPtr& msg){
+  current_state = *msg;
+  is_state_ready = true;
+}
+
 int main(int argc, char** argv) {
     ros::init(argc, argv, "waypoint_generator");
     ros::NodeHandle n("~");
@@ -312,6 +323,7 @@ int main(int argc, char** argv) {
     ros::Subscriber sub2 = n.subscribe("goal", 10, goal_callback);
     ros::Subscriber sub3 = n.subscribe("traj_start_trigger", 10, traj_start_trigger_callback);
     ros::Subscriber sub4 = n.subscribe("rc_demo", 10, rc_demo_callback);
+    ros::Subscriber state_sub = n.subscribe("/mavros/state", 10, state_callback);
     pub1 = n.advertise<nav_msgs::Path>("waypoints", 50);
     pub2 = n.advertise<geometry_msgs::PoseArray>("waypoints_vis", 10);
     pub3 = n.advertise<geometry_msgs::Pose>("waypoint_manual", 50);

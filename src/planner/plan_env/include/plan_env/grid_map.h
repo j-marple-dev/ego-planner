@@ -12,6 +12,7 @@
 #include <ros/ros.h>
 #include <tuple>
 #include <visualization_msgs/Marker.h>
+#include <nav_msgs/OccupancyGrid.h>
 
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -51,7 +52,7 @@ struct MappingParameters {
   Eigen::Vector3i map_voxel_num_;                        // map range in index
   Eigen::Vector3d local_update_range_;
   double resolution_, resolution_inv_;
-  double obstacles_inflation_;
+  double obstacles_inflation_, obstacles_inflation_secondary_;
   string frame_id_;
   int pose_type_;
 
@@ -89,6 +90,7 @@ struct MappingData {
 
   std::vector<double> occupancy_buffer_;
   std::vector<char> occupancy_buffer_inflate_;
+  std::vector<char> occupancy_buffer_inflate_secondary_;
 
   // camera position and pose data
 
@@ -123,6 +125,7 @@ struct MappingData {
   // range of updating grid
 
   Eigen::Vector3i local_bound_min_, local_bound_max_;
+  Eigen::Vector3i min_cut_, max_cut_;
 
   // computation time
 
@@ -149,12 +152,14 @@ public:
   inline int toAddress(int& x, int& y, int& z);
   inline bool isInMap(const Eigen::Vector3d& pos);
   inline bool isInMap(const Eigen::Vector3i& idx);
+  inline bool isInBoundary(const Eigen::Vector3i& idx);
 
   inline void setOccupancy(Eigen::Vector3d pos, double occ = 1);
   inline void setOccupied(Eigen::Vector3d pos);
   inline int getOccupancy(Eigen::Vector3d pos);
   inline int getOccupancy(Eigen::Vector3i id);
   inline int getInflateOccupancy(Eigen::Vector3d pos);
+  inline int getInflateSecondaryOccupancy(Eigen::Vector3d pos);
 
   inline void boundIndex(Eigen::Vector3i& id);
   inline bool isUnknown(const Eigen::Vector3i& id);
@@ -169,6 +174,7 @@ public:
 
   void publishUnknown();
   void publishDepth();
+  void publishGrid2D();
 
   bool hasDepthObservation();
   bool odomValid();
@@ -202,6 +208,7 @@ private:
   void clearAndInflateLocalMap();
 
   inline void inflatePoint(const Eigen::Vector3i& pt, int step, vector<Eigen::Vector3i>& pts);
+  inline void inflatePoint_2(const Eigen::Vector3i& pt, int step, vector<Eigen::Vector3i>& pts);
   int setCacheOccupancy(Eigen::Vector3d pos, int occ);
   Eigen::Vector3d closetPointInMap(const Eigen::Vector3d& pt, const Eigen::Vector3d& camera_pt);
 
@@ -232,6 +239,9 @@ private:
   uniform_real_distribution<double> rand_noise_;
   normal_distribution<double> rand_noise2_;
   default_random_engine eng_;
+
+  // for test
+  ros::Publisher grid_2d_pub_;
 };
 
 /* ============================== definition of inline function
@@ -322,7 +332,18 @@ inline int GridMap::getInflateOccupancy(Eigen::Vector3d pos) {
   Eigen::Vector3i id;
   posToIndex(pos, id);
 
+  if (!isInBoundary(id)) return 0;
+
   return int(md_.occupancy_buffer_inflate_[toAddress(id)]);
+}
+
+inline int GridMap::getInflateSecondaryOccupancy(Eigen::Vector3d pos) {
+  if (!isInMap(pos)) return -1;
+
+  Eigen::Vector3i id;
+  posToIndex(pos, id);
+
+  return int(md_.occupancy_buffer_inflate_secondary_[toAddress(id)]);
 }
 
 inline int GridMap::getOccupancy(Eigen::Vector3i id) {
@@ -352,6 +373,17 @@ inline bool GridMap::isInMap(const Eigen::Vector3i& idx) {
   }
   if (idx(0) > mp_.map_voxel_num_(0) - 1 || idx(1) > mp_.map_voxel_num_(1) - 1 ||
       idx(2) > mp_.map_voxel_num_(2) - 1) {
+    return false;
+  }
+  return true;
+}
+
+inline bool GridMap::isInBoundary(const Eigen::Vector3i& idx) {
+  if (idx(0) < md_.min_cut_(0) || idx(1) < md_.min_cut_(1) || idx(2) < md_.min_cut_(2)) {
+    return false;
+  }
+  if (idx(0) > md_.max_cut_(0) - 1 || idx(1) > md_.max_cut_(1) - 1 ||
+      idx(2) > md_.max_cut_(2) - 1) {
     return false;
   }
   return true;
@@ -390,6 +422,16 @@ inline void GridMap::inflatePoint(const Eigen::Vector3i& pt, int step, vector<Ei
   for (int x = -step; x <= step; ++x)
     for (int y = -step; y <= step; ++y)
       for (int z = -step; z <= step; ++z) {
+        pts[num++] = Eigen::Vector3i(pt(0) + x, pt(1) + y, pt(2) + z);
+      }
+}
+
+// for 8 in 1 cell
+inline void GridMap::inflatePoint_2(const Eigen::Vector3i& pt, int step, vector<Eigen::Vector3i>& pts) {
+  int num = 0;
+  for (int x = -step; x <= step + 1; ++x)
+    for (int y = -step; y <= step + 1; ++y)
+      for (int z = -step; z <= step + 1; ++z) {
         pts[num++] = Eigen::Vector3i(pt(0) + x, pt(1) + y, pt(2) + z);
       }
 }

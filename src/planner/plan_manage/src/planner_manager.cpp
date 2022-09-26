@@ -216,10 +216,6 @@ namespace ego_planner
 
     t_init = ros::Time::now() - t_start;
 
-    static int vis_id = 0;
-    visualization_->displayInitPathList(point_set, 0.2, 0);
-    visualization_->displayAStarList(a_star_pathes, vis_id);
-
     t_start = ros::Time::now();
 
     /*** STEP 2: OPTIMIZE ***/
@@ -265,6 +261,10 @@ namespace ego_planner
     updateTrajInfo(pos, ros::Time::now());
 
     cout << "total time:\033[42m" << (t_init + t_opt + t_refine).toSec() << "\033[0m,optimize:" << (t_init + t_opt).toSec() << ",refine:" << t_refine.toSec() << endl;
+
+    static int vis_id = 0;
+    visualization_->displayInitPathList(point_set, 0.2, 0);
+    visualization_->displayAStarList(a_star_pathes, vis_id);
 
     // success. YoY
     continous_failures_count_ = 0;

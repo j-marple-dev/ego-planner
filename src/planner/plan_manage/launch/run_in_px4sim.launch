@@ -2,10 +2,10 @@
   <!-- size of map, change the size inflate x, y, z according to your application -->
   <arg name="map_size_x" value="100.0"/>
   <arg name="map_size_y" value="100.0"/>
-  <arg name="map_size_z" value=" 20.0"/>
+  <arg name="map_size_z" value=" 4.5"/>
 
   <!-- topic of your odometry such as VIO or LIO -->
-  <arg name="odom_topic" value="/mavros/local_position/odom" />
+  <arg name="odom_topic" value="/Odometry" />
 
   <!-- main algorithm params -->
   <include file="$(find ego_planner)/launch/advanced_param.xml">
@@ -19,7 +19,7 @@
     <!-- depth topic: depth image, 640x480 by default -->
     <!-- don't set cloud_topic if you already set these ones! -->
     <arg name="camera_pose_topic" value="/pcl_render_node/camera_pose"/>
-    <arg name="depth_topic" value="/camera/depth/image_raw"/>
+    <arg name="depth_topic" value="none"/>
 
     <!-- topic of point cloud measurement, such as from LIDAR  -->
     <!-- don't set camera pose and depth, if you already set this one! -->
@@ -36,7 +36,7 @@
     <arg name="max_acc" value="3.0" />
 
     <!--always set to 1.5 times grater than sensing horizen-->
-    <arg name="planning_horizon" value="7.5" /> 
+    <arg name="planning_horizon" value="14.5" /> 
 
     <!-- 1: use 2D Nav Goal to select goal  -->
     <!-- 2: use global waypoints below  -->

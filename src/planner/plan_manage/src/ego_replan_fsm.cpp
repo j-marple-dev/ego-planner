@@ -247,6 +247,7 @@ namespace ego_planner
 
     bool success = false;
     end_pt_ << msg.poses[0].pose.position.x, msg.poses[0].pose.position.y, msg.poses[0].pose.position.z;
+    // end_pt_ << checkEnableWaypoint(odom_pos_, {msg.poses[0].pose.position.x, msg.poses[0].pose.position.y, msg.poses[0].pose.position.z});
     success = planner_manager_->planGlobalTraj(odom_pos_, odom_vel_, Eigen::Vector3d::Zero(), end_pt_, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
 
     visualization_->displayGoalPoint(end_pt_, Eigen::Vector4d(0, 0.5, 0.5, 1), 0.3, 0);
@@ -571,10 +572,28 @@ namespace ego_planner
     // }
   }
 
+  Eigen::Vector3d EGOReplanFSM::checkEnableWaypoint(const Eigen::Vector3d &start, const Eigen::Vector3d &waypoint) {
+    auto map = planner_manager_->grid_map_;
+    Eigen::Vector3d direction = (waypoint - start).normalized();
+
+    for (double d = (waypoint - start).norm(); d > 0; d -= map->getResolution() * 0.5) {
+      Eigen::Vector3d point = start + direction * d;
+      if (map->getInflateSecondaryOccupancy(point) == 0) {
+        return point;
+      }
+    }
+    
+    return start;
+  }
+
   bool EGOReplanFSM::callReboundReplan(bool flag_use_poly_init, bool flag_randomPolyTraj)
   {
 
     getLocalTarget();
+    // ROS_WARN("===============================");
+    // std::cout << "local_target_pt_ : " << local_target_pt_.x() << ", " << local_target_pt_.y() << ", " << local_target_pt_.z() << std::endl;
+    // std::cout << "end_pt_ : " << end_pt_.x() << ", " << end_pt_.y() << ", " << end_pt_.z() << std::endl;
+    // ROS_WARN("===============================");
 
     bool plan_success =
         planner_manager_->reboundReplan(start_pt_, start_vel_, start_acc_, local_target_pt_, local_target_vel_, (have_new_target_ || flag_use_poly_init), flag_randomPolyTraj);

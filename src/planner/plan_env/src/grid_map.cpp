@@ -17,6 +17,7 @@ void GridMap::initMap(ros::NodeHandle &nh)
   node_.param("grid_map/local_update_range_y", mp_.local_update_range_(1), -1.0);
   node_.param("grid_map/local_update_range_z", mp_.local_update_range_(2), -1.0);
   node_.param("grid_map/obstacles_inflation", mp_.obstacles_inflation_, -1.0);
+  node_.param("grid_map/obstacles_inflation_secondary", mp_.obstacles_inflation_secondary_, -1.0);
 
   node_.param("grid_map/fx", mp_.fx_, -1.0);
   node_.param("grid_map/fy", mp_.fy_, -1.0);
@@ -78,6 +79,7 @@ void GridMap::initMap(ros::NodeHandle &nh)
 
   md_.occupancy_buffer_ = vector<double>(buffer_size, mp_.clamp_min_log_ - mp_.unknown_flag_);
   md_.occupancy_buffer_inflate_ = vector<char>(buffer_size, 0);
+  md_.occupancy_buffer_inflate_secondary_ = vector<char>(buffer_size, -1);
 
   md_.count_hit_and_miss_ = vector<short>(buffer_size, 0);
   md_.count_hit_ = vector<short>(buffer_size, 0);
@@ -128,6 +130,8 @@ void GridMap::initMap(ros::NodeHandle &nh)
   map_inf_pub_ = node_.advertise<sensor_msgs::PointCloud2>("/grid_map/occupancy_inflate", 10);
 
   unknown_pub_ = node_.advertise<sensor_msgs::PointCloud2>("/grid_map/unknown", 10);
+
+  grid_2d_pub_ = node_.advertise<nav_msgs::OccupancyGrid>("/grid_map/grid_2d", 10);
 
   md_.occ_need_update_ = false;
   md_.local_updated_ = false;
@@ -532,6 +536,9 @@ void GridMap::clearAndInflateLocalMap()
   boundIndex(min_cut);
   boundIndex(max_cut);
 
+  md_.min_cut_ = min_cut;
+  md_.max_cut_ = max_cut;
+
   Eigen::Vector3i min_cut_m = min_cut - Eigen::Vector3i(vec_margin, vec_margin, vec_margin);
   Eigen::Vector3i max_cut_m = max_cut + Eigen::Vector3i(vec_margin, vec_margin, vec_margin);
   boundIndex(min_cut_m);
@@ -598,6 +605,8 @@ void GridMap::clearAndInflateLocalMap()
   // inf_pts.resize(4 * inf_step + 3);
   Eigen::Vector3i inf_pt;
 
+  ros::Time time_1 = ros::Time::now();
+
   // clear outdated data
   for (int x = md_.local_bound_min_(0); x <= md_.local_bound_max_(0); ++x)
     for (int y = md_.local_bound_min_(1); y <= md_.local_bound_max_(1); ++y)
@@ -640,6 +649,152 @@ void GridMap::clearAndInflateLocalMap()
         md_.occupancy_buffer_inflate_[toAddress(x, y, ceil_id)] = 1;
       }
   }
+// return;//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  ros::Time time_2 = ros::Time::now();
+
+  int inf_step_secondary = ceil(mp_.obstacles_inflation_secondary_ / mp_.resolution_) - inf_step;
+  if (inf_step_secondary < 0) {
+    std::cout<<"inf_step_secondary error: " << inf_step_secondary << std::endl;
+    return;
+  }
+
+  vector<Eigen::Vector3i> inf_secondary_pts(pow(2 * inf_step_secondary + 2, 3));
+
+  // clear outdated data
+  for (int x = min_cut(0); x <= max_cut(0); ++x)
+    for (int y = min_cut(1); y <= max_cut(1); ++y)
+      for (int z = min_cut(2); z <= max_cut(2); ++z)
+      {
+        md_.occupancy_buffer_inflate_secondary_[toAddress(x, y, z)] = -1;
+      }
+
+  // inflate obstacles
+  for (int x = min_cut(0) + (min_cut(0) % 2); x < max_cut(0); x+=2)
+    for (int y = min_cut(1) + (min_cut(1) % 2); y < max_cut(1); y+=2)
+      for (int z = min_cut(2) + (min_cut(2) % 2); z < max_cut(2); z+=2)
+      {
+        // reduce computing time
+        bool is_occ = false;
+        for (int _x = x; _x < x + 2; _x++) {
+          for (int _y = y; _y < y + 2; _y++) {
+            for (int _z = z; _z < z + 2; _z++) {
+              if (md_.occupancy_buffer_inflate_[toAddress(_x, _y, _z)] > 0) {
+                is_occ = true;
+              }
+              if (is_occ) break;
+            }
+            if (is_occ) break;
+          }
+          if (is_occ) break;
+        }
+
+        // if (md_.occupancy_buffer_[toAddress(x, y, z)] > mp_.min_occupancy_log_)
+        if (is_occ)
+        {
+          inflatePoint_2(Eigen::Vector3i(x, y, z), inf_step_secondary, inf_secondary_pts);
+
+          for (int k = 0; k < (int)inf_secondary_pts.size(); ++k)
+          {
+            inf_pt = inf_secondary_pts[k];
+            int idx_inf = toAddress(inf_pt);
+            if (idx_inf < 0 ||
+                idx_inf >= mp_.map_voxel_num_(0) * mp_.map_voxel_num_(1) * mp_.map_voxel_num_(2))
+            {
+              continue;
+            }
+            md_.occupancy_buffer_inflate_secondary_[idx_inf] = 100;
+          }
+        }
+      }
+
+  // add virtual floor to limit flight height
+  {
+    for (int x = min_cut(0); x <= max_cut(0); ++x)
+      for (int y = min_cut(1); y <= max_cut(1); ++y)
+        for (int z = 0; z <= inf_step_secondary; ++z)
+          md_.occupancy_buffer_inflate_secondary_[toAddress(x, y, z)] = 100;
+  }
+
+  // add virtual ceiling to limit flight height
+  if (mp_.virtual_ceil_height_ > -0.5)
+  {
+    int ceil_id = floor((mp_.virtual_ceil_height_ - mp_.map_origin_(2)) * mp_.resolution_inv_) - inf_step_secondary;
+    for (int x = min_cut(0); x <= max_cut(0); ++x)
+      for (int y = min_cut(1); y <= max_cut(1); ++y)
+      {
+        md_.occupancy_buffer_inflate_secondary_[toAddress(x, y, ceil_id)] = 100;
+      }
+  }
+
+  // test paint
+  {
+    // clear free cell
+    for (int x = min_cut(0); x <= max_cut(0); ++x)
+      for (int y = min_cut(1); y <= max_cut(1); ++y)
+        for (int z = min_cut(2); z <= max_cut(2); ++z)
+          if (md_.occupancy_buffer_inflate_secondary_[toAddress(x, y, z)] == 0)
+            md_.occupancy_buffer_inflate_secondary_[toAddress(x, y, z)] = -1;
+
+    // int fixed_z = 10;
+    int search_count = 0;
+
+    Eigen::Vector3i init_pos;
+    posToIndex(md_.camera_pos_, init_pos);
+    init_pos.x() = init_pos.x() + ((init_pos.x() + inf_step_secondary) % 2);
+    init_pos.y() = init_pos.y() + ((init_pos.y() + inf_step_secondary) % 2);
+    init_pos.z() = init_pos.z() + ((init_pos.z() + inf_step_secondary) % 2);
+    // init_pos.z() = fixed_z;
+
+    std::vector<Eigen::Vector3i> paint_stack;
+    paint_stack.push_back(init_pos);
+    md_.occupancy_buffer_inflate_secondary_[toAddress(paint_stack.back())] = 0;
+
+    std::vector<Eigen::Vector3i> search_cells;
+    search_cells.resize(6);
+
+    vector<Eigen::Vector3i> inf_oct_pts(8);
+
+    while (paint_stack.size() > 0) {
+      Eigen::Vector3i cell = paint_stack.back();
+      paint_stack.pop_back();
+
+      search_cells[0] = cell + Eigen::Vector3i(-2, 0, 0);
+      search_cells[1] = cell + Eigen::Vector3i( 2, 0, 0);
+      search_cells[2] = cell + Eigen::Vector3i( 0,-2, 0);
+      search_cells[3] = cell + Eigen::Vector3i( 0, 2, 0);
+      search_cells[4] = cell + Eigen::Vector3i( 0, 0,-2);
+      search_cells[5] = cell + Eigen::Vector3i( 0, 0, 2);
+
+      for (int i = 0; i < 6; i++) {
+        Eigen::Vector3i search_cell = search_cells[i];
+        if (search_cell(0) < min_cut(0) || search_cell(0) > max_cut(0))
+          continue;
+        if (search_cell(1) < min_cut(1) || search_cell(1) > max_cut(1))
+          continue;
+        if (search_cell(2) < min_cut(2) || search_cell(2) > max_cut(2))
+          continue;
+        int cell_idx = toAddress(search_cell);
+        if (md_.occupancy_buffer_inflate_secondary_[cell_idx] == -1) {
+          inflatePoint_2(search_cell, 0, inf_oct_pts);
+          
+          for (int k = 0; k < (int)inf_oct_pts.size(); ++k)
+          {
+            int idx_inf = toAddress(inf_oct_pts[k]);
+            md_.occupancy_buffer_inflate_secondary_[idx_inf] = 0;
+          }
+
+          paint_stack.push_back(search_cell);
+          search_count++;
+        }
+      }
+    }
+  }
+
+  ros::Time time_3 = ros::Time::now();
+
+  // compute time check
+  // std::cout << "time1~2 : " << (time_2 - time_1).toSec() << ", time2~3 : " << (time_3 - time_2).toSec() << std::endl;
 }
 
 void GridMap::visCallback(const ros::TimerEvent & /*event*/)
@@ -647,6 +802,7 @@ void GridMap::visCallback(const ros::TimerEvent & /*event*/)
 
   publishMap();
   publishMapInflate(true);
+  publishGrid2D();
 }
 
 void GridMap::updateOccupancyCallback(const ros::TimerEvent & /*event*/)
@@ -926,6 +1082,60 @@ void GridMap::publishMapInflate(bool all_info)
   map_inf_pub_.publish(cloud_msg);
 
   // ROS_INFO("pub map");
+}
+
+void GridMap::publishGrid2D()
+{
+  Eigen::Vector3i min_cut = md_.local_bound_min_;
+  Eigen::Vector3i max_cut = md_.local_bound_max_;
+
+  int lmm = mp_.local_map_margin_;
+  min_cut -= Eigen::Vector3i(lmm, lmm, lmm);
+  max_cut += Eigen::Vector3i(lmm, lmm, lmm);
+
+  boundIndex(min_cut);
+  boundIndex(max_cut);
+
+  nav_msgs::OccupancyGrid sliced_map;
+  sliced_map.header.stamp = ros::Time::now();
+
+  Eigen::Vector3i center;
+  posToIndex(md_.camera_pos_, center);
+  center(2) = min(max_cut.z() - 5, max(min_cut.z() + 5, center(2)));
+
+  Eigen::Vector3d pos_mean, pos_ori;
+  indexToPos((min_cut + max_cut) / 2, pos_mean);
+  indexToPos({min_cut.x(), min_cut.y(), center(2)}, pos_ori);
+  sliced_map.info.origin.position.x = pos_ori.x();
+  sliced_map.info.origin.position.y = pos_ori.y();
+  sliced_map.info.origin.position.z = pos_ori.z();
+  sliced_map.info.resolution = mp_.resolution_;
+  sliced_map.info.width = max_cut.x() - min_cut.x();
+  sliced_map.info.height = max_cut.y() - min_cut.y();
+  sliced_map.header.frame_id = "map";
+
+  sliced_map.data.resize((max_cut.x() - min_cut.x()) * (max_cut.y() - min_cut.y()), -1);
+
+
+  int count = 0;
+  for (int y = min_cut(1); y < max_cut(1); ++y)
+    for (int x = min_cut(0); x < max_cut(0); ++x) {
+      // if (md_.occupancy_buffer_inflate_secondary_[toAddress(x, y, z)] > 0)
+        sliced_map.data[count] = md_.occupancy_buffer_inflate_secondary_[toAddress(x, y, center(2))];
+      
+      // test range
+      if (x == min_cut(0) || x == max_cut(0) - 1 || y == min_cut(1) || y == max_cut(1) - 1) {
+        sliced_map.data[count] = -3;
+      } else {
+        int dist_x = x - center(0);
+        int dist_y = y - center(1);
+        if (sqrt(dist_x * dist_x + dist_y * dist_y) > 100)
+          sliced_map.data[count] = -2;
+      }
+      count++;
+    }
+
+  grid_2d_pub_.publish(sliced_map);
 }
 
 void GridMap::publishUnknown()

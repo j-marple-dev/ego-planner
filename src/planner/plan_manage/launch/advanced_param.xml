@@ -81,7 +81,7 @@
     <param name="grid_map/local_update_range_y"  value="9.5" /> 
     <param name="grid_map/local_update_range_z"  value="2.5" /> 
     <param name="grid_map/obstacles_inflation"     value="0.199" /> 
-    <param name="grid_map/obstacles_inflation_secondary"     value="0.399" /> 
+    <param name="grid_map/obstacles_inflation_secondary"     value="0.299" /> 
     <param name="grid_map/local_map_margin" value="30"/>
     <param name="grid_map/ground_height"        value="-0.11"/>
     <!-- camera parameter -->
@@ -107,7 +107,7 @@
     <param name="grid_map/max_ray_length" value="9.5"/>
 
     <param name="grid_map/virtual_ceil_height"   value="4.0"/>
-    <param name="grid_map/visualization_truncate_height"   value="3.9"/>
+    <param name="grid_map/visualization_truncate_height"   value="3.5"/>
     <param name="grid_map/show_occ_time"  value="false"/>
     <param name="grid_map/pose_type"     value="2"/>  
     <param name="grid_map/frame_id"      value="map"/>

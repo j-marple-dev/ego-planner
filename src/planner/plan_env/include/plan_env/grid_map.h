@@ -161,6 +161,9 @@ public:
   inline int getInflateOccupancy(Eigen::Vector3d pos);
   inline int getInflateSecondaryOccupancy(Eigen::Vector3d pos);
 
+  inline void resetSearchArea();
+  inline void setSearchAreaH();
+
   inline void boundIndex(Eigen::Vector3i& id);
   inline bool isUnknown(const Eigen::Vector3i& id);
   inline bool isUnknown(const Eigen::Vector3d& pos);
@@ -332,9 +335,9 @@ inline int GridMap::getInflateOccupancy(Eigen::Vector3d pos) {
   Eigen::Vector3i id;
   posToIndex(pos, id);
 
-  if (!isInBoundary(id)) return 0;
+  if (!isInBoundary(id)) return 1;
 
-  return int(md_.occupancy_buffer_inflate_[toAddress(id)]);
+  return int(md_.occupancy_buffer_inflate_secondary_[toAddress(id)]);
 }
 
 inline int GridMap::getInflateSecondaryOccupancy(Eigen::Vector3d pos) {
@@ -352,6 +355,27 @@ inline int GridMap::getOccupancy(Eigen::Vector3i id) {
     return -1;
 
   return md_.occupancy_buffer_[toAddress(id)] > mp_.min_occupancy_log_ ? 1 : 0;
+}
+
+inline void GridMap::resetSearchArea() {
+  Eigen::Vector3i min_cut = md_.local_bound_min_ -
+                            Eigen::Vector3i(mp_.local_map_margin_, mp_.local_map_margin_, mp_.local_map_margin_);
+  Eigen::Vector3i max_cut = md_.local_bound_max_ +
+                            Eigen::Vector3i(mp_.local_map_margin_, mp_.local_map_margin_, mp_.local_map_margin_);
+  boundIndex(min_cut);
+  boundIndex(max_cut);
+
+  md_.min_cut_ = min_cut;
+  md_.max_cut_ = max_cut;
+}
+
+inline void GridMap::setSearchAreaH() {
+  resetSearchArea();
+
+  Eigen::Vector3i pos_i;
+  posToIndex(md_.camera_pos_, pos_i);
+  md_.min_cut_.z() = max(md_.min_cut_.z(), pos_i.z() - 2);
+  md_.max_cut_.z() = min(md_.max_cut_.z(), pos_i.z() + 2);
 }
 
 inline bool GridMap::isInMap(const Eigen::Vector3d& pos) {

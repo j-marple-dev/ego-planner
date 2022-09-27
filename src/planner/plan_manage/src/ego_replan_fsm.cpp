@@ -246,7 +246,7 @@ namespace ego_planner
     init_pt_ = odom_pos_;
 
     bool success = false;
-    end_pt_ << msg.poses[0].pose.position.x, msg.poses[0].pose.position.y, msg.poses[0].pose.position.z;
+    end_pt_ << msg.poses[0].pose.position.x, msg.poses[0].pose.position.y, odom_pos_(2);// msg.poses[0].pose.position.z;
     // end_pt_ << checkEnableWaypoint(odom_pos_, {msg.poses[0].pose.position.x, msg.poses[0].pose.position.y, msg.poses[0].pose.position.z});
     success = planner_manager_->planGlobalTraj(odom_pos_, odom_vel_, Eigen::Vector3d::Zero(), end_pt_, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
 
@@ -387,9 +387,15 @@ namespace ego_planner
 
       bool flag_random_poly_init;
       if (timesOfConsecutiveStateCalls().first == 1)
+      {
         flag_random_poly_init = false;
+        planner_manager_->grid_map_->setSearchAreaH();
+      }
       else
+      {
         flag_random_poly_init = true;
+        planner_manager_->grid_map_->resetSearchArea();
+      }
 
       bool success = callReboundReplan(true, flag_random_poly_init);
       if (success)

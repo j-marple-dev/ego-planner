@@ -666,7 +666,7 @@ void GridMap::clearAndInflateLocalMap()
     for (int y = min_cut(1); y <= max_cut(1); ++y)
       for (int z = min_cut(2); z <= max_cut(2); ++z)
       {
-        md_.occupancy_buffer_inflate_secondary_[toAddress(x, y, z)] = -1;
+        md_.occupancy_buffer_inflate_secondary_[toAddress(x, y, z)] = 0;
       }
 
   // inflate obstacles
@@ -728,68 +728,68 @@ void GridMap::clearAndInflateLocalMap()
   }
 
   // test paint
-  {
-    // clear free cell
-    for (int x = min_cut(0); x <= max_cut(0); ++x)
-      for (int y = min_cut(1); y <= max_cut(1); ++y)
-        for (int z = min_cut(2); z <= max_cut(2); ++z)
-          if (md_.occupancy_buffer_inflate_secondary_[toAddress(x, y, z)] == 0)
-            md_.occupancy_buffer_inflate_secondary_[toAddress(x, y, z)] = -1;
+  // {
+  //   // clear free cell
+  //   for (int x = min_cut(0); x <= max_cut(0); ++x)
+  //     for (int y = min_cut(1); y <= max_cut(1); ++y)
+  //       for (int z = min_cut(2); z <= max_cut(2); ++z)
+  //         if (md_.occupancy_buffer_inflate_secondary_[toAddress(x, y, z)] == 0)
+  //           md_.occupancy_buffer_inflate_secondary_[toAddress(x, y, z)] = -1;
 
-    // int fixed_z = 10;
-    int search_count = 0;
+  //   // int fixed_z = 10;
+  //   int search_count = 0;
 
-    Eigen::Vector3i init_pos;
-    posToIndex(md_.camera_pos_, init_pos);
-    init_pos.x() = init_pos.x() + ((init_pos.x() + inf_step_secondary) % 2);
-    init_pos.y() = init_pos.y() + ((init_pos.y() + inf_step_secondary) % 2);
-    init_pos.z() = init_pos.z() + ((init_pos.z() + inf_step_secondary) % 2);
-    // init_pos.z() = fixed_z;
+  //   Eigen::Vector3i init_pos;
+  //   posToIndex(md_.camera_pos_, init_pos);
+  //   init_pos.x() = init_pos.x() + ((init_pos.x() + inf_step_secondary) % 2);
+  //   init_pos.y() = init_pos.y() + ((init_pos.y() + inf_step_secondary) % 2);
+  //   init_pos.z() = init_pos.z() + ((init_pos.z() + inf_step_secondary) % 2);
+  //   // init_pos.z() = fixed_z;
 
-    std::vector<Eigen::Vector3i> paint_stack;
-    paint_stack.push_back(init_pos);
-    md_.occupancy_buffer_inflate_secondary_[toAddress(paint_stack.back())] = 0;
+  //   std::vector<Eigen::Vector3i> paint_stack;
+  //   paint_stack.push_back(init_pos);
+  //   md_.occupancy_buffer_inflate_secondary_[toAddress(paint_stack.back())] = 0;
 
-    std::vector<Eigen::Vector3i> search_cells;
-    search_cells.resize(6);
+  //   std::vector<Eigen::Vector3i> search_cells;
+  //   search_cells.resize(6);
 
-    vector<Eigen::Vector3i> inf_oct_pts(8);
+  //   vector<Eigen::Vector3i> inf_oct_pts(8);
 
-    while (paint_stack.size() > 0) {
-      Eigen::Vector3i cell = paint_stack.back();
-      paint_stack.pop_back();
+  //   while (paint_stack.size() > 0) {
+  //     Eigen::Vector3i cell = paint_stack.back();
+  //     paint_stack.pop_back();
 
-      search_cells[0] = cell + Eigen::Vector3i(-2, 0, 0);
-      search_cells[1] = cell + Eigen::Vector3i( 2, 0, 0);
-      search_cells[2] = cell + Eigen::Vector3i( 0,-2, 0);
-      search_cells[3] = cell + Eigen::Vector3i( 0, 2, 0);
-      search_cells[4] = cell + Eigen::Vector3i( 0, 0,-2);
-      search_cells[5] = cell + Eigen::Vector3i( 0, 0, 2);
+  //     search_cells[0] = cell + Eigen::Vector3i(-2, 0, 0);
+  //     search_cells[1] = cell + Eigen::Vector3i( 2, 0, 0);
+  //     search_cells[2] = cell + Eigen::Vector3i( 0,-2, 0);
+  //     search_cells[3] = cell + Eigen::Vector3i( 0, 2, 0);
+  //     search_cells[4] = cell + Eigen::Vector3i( 0, 0,-2);
+  //     search_cells[5] = cell + Eigen::Vector3i( 0, 0, 2);
 
-      for (int i = 0; i < 6; i++) {
-        Eigen::Vector3i search_cell = search_cells[i];
-        if (search_cell(0) < min_cut(0) || search_cell(0) > max_cut(0))
-          continue;
-        if (search_cell(1) < min_cut(1) || search_cell(1) > max_cut(1))
-          continue;
-        if (search_cell(2) < min_cut(2) || search_cell(2) > max_cut(2))
-          continue;
-        int cell_idx = toAddress(search_cell);
-        if (md_.occupancy_buffer_inflate_secondary_[cell_idx] == -1) {
-          inflatePoint_2(search_cell, 0, inf_oct_pts);
+  //     for (int i = 0; i < 6; i++) {
+  //       Eigen::Vector3i search_cell = search_cells[i];
+  //       if (search_cell(0) < min_cut(0) || search_cell(0) > max_cut(0))
+  //         continue;
+  //       if (search_cell(1) < min_cut(1) || search_cell(1) > max_cut(1))
+  //         continue;
+  //       if (search_cell(2) < min_cut(2) || search_cell(2) > max_cut(2))
+  //         continue;
+  //       int cell_idx = toAddress(search_cell);
+  //       if (md_.occupancy_buffer_inflate_secondary_[cell_idx] == -1) {
+  //         inflatePoint_2(search_cell, 0, inf_oct_pts);
           
-          for (int k = 0; k < (int)inf_oct_pts.size(); ++k)
-          {
-            int idx_inf = toAddress(inf_oct_pts[k]);
-            md_.occupancy_buffer_inflate_secondary_[idx_inf] = 0;
-          }
+  //         for (int k = 0; k < (int)inf_oct_pts.size(); ++k)
+  //         {
+  //           int idx_inf = toAddress(inf_oct_pts[k]);
+  //           md_.occupancy_buffer_inflate_secondary_[idx_inf] = 0;
+  //         }
 
-          paint_stack.push_back(search_cell);
-          search_count++;
-        }
-      }
-    }
-  }
+  //         paint_stack.push_back(search_cell);
+  //         search_count++;
+  //       }
+  //     }
+  //   }
+  // }
 
   ros::Time time_3 = ros::Time::now();
 

@@ -6,6 +6,7 @@ import yaml
 import time
 import threading
 
+from std_msgs.msg import String
 from mavros_msgs.msg import RCIn
 
 from utils import ControlMessage, WaypointMessage
@@ -23,6 +24,7 @@ class RCHandler:
         self.target_waypoint = target_waypoint
 
         self.rc_sub = rospy.Subscriber("/mavros/rc/in", RCIn, self.callback_rc_in)
+        self.waypoint_trigger_sub = rospy.Subscriber("/custom/waypoint_trigger", String, self.callback_waypoint_trigger)
         self.control_msg = ControlMessage()
         self.waypoint_msg = WaypointMessage()
 
@@ -68,6 +70,18 @@ class RCHandler:
         self.waypoint_msg.clear_waypoint()
 
         waypoint_thread_lock.release()
+
+    def callback_waypoint_trigger(self, msg: String) -> None:
+        """Test trigger callback for waypoint flight.
+
+        You will need to trigger this by following command.
+        rostopic pub /custom/waypoint_trigger std_msgs/String "data: 'on'"
+        rostopic pub /custom/waypoint_trigger std_msgs/String "data: 'off'"
+        """
+        if msg.data == "on":
+            self._start_waypoint()
+        elif msg.data == "off":
+            self._terminate_waypoint()
 
     def callback_rc_in(self, msg: RCIn) -> None:
         """Receieves /mavros/rc/in

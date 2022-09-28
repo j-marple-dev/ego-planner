@@ -530,8 +530,19 @@ namespace ego_planner
     auto map = planner_manager_->grid_map_;
     double t_end = current_traj_.getTimeSum();
 
+    auto getInflateOccupancy_orig = [map](Eigen::Vector3d pos) {
+      if (!map->isInMap(pos)) return -1;
+
+      Eigen::Vector3i id;
+      map->posToIndex(pos, id);
+
+      if (!map->isInBoundary(id)) return 1;
+
+      return int(map->isKnownOccupied(id));
+    };
+
     for (double t = 0; t < t_end; t += 0.1) {
-      if (map->getInflateOccupancy(current_traj_.evaluateDeBoorT(t))) {
+      if (getInflateOccupancy_orig(current_traj_.evaluateDeBoorT(t))) {
         is_need_replan_ = true;
         break;
       }

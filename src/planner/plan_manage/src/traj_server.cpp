@@ -184,9 +184,10 @@ void cmdCallback(const ros::TimerEvent &e)
 
   /* check receive traj_ before calculate target */
   if (receive_traj_) {
+    Eigen::Vector3d z_offset = Eigen::Vector3d(0, 0, 0.1);
     Eigen::Vector3d closestPoint = findClosestPoint(odom_pos_, traj_[0]);
-    Eigen::Vector3d refTarget = findClosestPoint(closestPoint, traj_[0], forward_length_);
-    Eigen::Vector3d refTarget_forward = findClosestPoint(closestPoint, traj_[0], forward_length_ * 2.5);
+    Eigen::Vector3d refTarget = findClosestPoint(closestPoint, traj_[0], forward_length_) + z_offset;
+    Eigen::Vector3d refTarget_forward = findClosestPoint(closestPoint, traj_[0], forward_length_ * 2.5) + z_offset;
     Eigen::Vector3d sub_vector(refTarget.x() - odom_pos_.x(), refTarget.y() - odom_pos_.y(), 0);
     
     double ref_yaw = last_yaw_;

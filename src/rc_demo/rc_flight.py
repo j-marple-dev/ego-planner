@@ -4,19 +4,29 @@ import sys
 import rospy
 import yaml
 import time
+import threading
 
 from mavros_msgs.msg import RCIn
 
 from utils import ControlMessage, WaypointMessage
 
+waypoint_thread_lock = threading.Lock()
+
 class RCHandler:
     """Receieve RC stick data."""
 
-    def __init__(self, use_rc_control: bool = True, waypoint_path: str = "") -> None:
+    def __init__(self,
+                 use_rc_control: bool = True,
+                 waypoint_path: str = "",
+                 target_waypoint: str = "waypoint_0") -> None:
         self.use_rc_control = use_rc_control
+        self.target_waypoint = target_waypoint
+
         self.rc_sub = rospy.Subscriber("/mavros/rc/in", RCIn, self.callback_rc_in)
         self.control_msg = ControlMessage()
         self.waypoint_msg = WaypointMessage()
+
+        self.is_waypoint_working = False
 
         self.is_calibrated = False
         self.calib_count = 0
@@ -39,16 +49,38 @@ class RCHandler:
                 'waypoint_1': [[0.0, 0.0, 1.2]],
             }
 
-        time.sleep(3)
-        for waypoint in self.waypoints['waypoint_0']:
-            self.waypoint_msg.add_waypoint(*waypoint)
+    def _start_waypoint(self) -> None:
+        if self.is_waypoint_working:
+            return
 
+        waypoint_thread_lock.acquire()
+
+        self.is_waypoint_working = True
+        self.waypoint_msg.clear_waypoint()
+        self.waypoint_msg.add_waypoints(self.waypoints[self.target_waypoint])
+
+        waypoint_thread_lock.release()
+
+    def _terminate_waypoint(self) -> None:
+        waypoint_thread_lock.acquire()
+
+        self.is_waypoint_working = False
+        self.waypoint_msg.clear_waypoint()
+
+        waypoint_thread_lock.release()
 
     def callback_rc_in(self, msg: RCIn) -> None:
         """Receieves /mavros/rc/in
 
         Receieved stick message will be sent
         """
+
+        # Check waypoint switch
+        if 1300 < msg.channels[6] < 1700:
+            self._start_waypoint()
+        elif 1000 < msg.channels[6] < 1300:
+            self._terminate_waypoint()
+
         for i in range(4):
             self.val_range[0] = min(self.val_range[0], msg.channels[i])
             self.val_range[1] = max(self.val_range[1], msg.channels[i])
@@ -93,10 +125,12 @@ class RCHandler:
 if __name__ == "__main__":
     args = rospy.myargv(argv=sys.argv)
     rospy.init_node("flight_control_node", anonymous=True)
+
     use_rc_control = rospy.get_param('~rc_control', False)
     waypoint_path = rospy.get_param('~waypoint', "")
+    target_waypoint = rospy.get_param('~target_waypoint', "waypoint_0")
 
-    rc_handler = RCHandler(use_rc_control, waypoint_path)
+    rc_handler = RCHandler(use_rc_control, waypoint_path, target_waypoint)
 
     rospy.spin()
 

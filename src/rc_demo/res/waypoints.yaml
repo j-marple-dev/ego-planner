@@ -1,4 +1,5 @@
 waypoint_0:
+  # This way point has been set from roslaunch simulation_environment mavros_posix_sitl_lidar.launch world:=$HOME/custom_worlds/add_competition_outfield.world x:=4 y:=0 z:=1 vehicle:=px4vision lidar:=ouster
   [
     [10.0, 1.5, 2.0],
     [14, 0.8, 3.2],

@@ -30,7 +30,7 @@ namespace ego_planner
     bspline_optimizer_rebound_->setParam(nh);
     bspline_optimizer_rebound_->setEnvironment(grid_map_);
     bspline_optimizer_rebound_->a_star_.reset(new AStar);
-    bspline_optimizer_rebound_->a_star_->initGridMap(grid_map_, Eigen::Vector3i(100, 100, 100));
+    bspline_optimizer_rebound_->a_star_->initGridMap(grid_map_, Eigen::Vector3i(200, 200, 200));
 
     visualization_ = vis;
   }
@@ -264,7 +264,7 @@ namespace ego_planner
 
     static int vis_id = 0;
     visualization_->displayInitPathList(point_set, 0.2, 0);
-    visualization_->displayAStarList(a_star_pathes, vis_id);
+    // visualization_->displayAStarList(a_star_pathes, vis_id);
 
     // success. YoY
     continous_failures_count_ = 0;

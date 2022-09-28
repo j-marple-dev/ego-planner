@@ -44,12 +44,12 @@ namespace ego_planner
 
     int getFailuresCount() { return continous_failures_count_; }
 
-  private:
-    /* main planning algorithms & modules */
     PlanningVisualization::Ptr visualization_;
 
     BsplineOptimizer::Ptr bspline_optimizer_rebound_;
 
+  private:
+    /* main planning algorithms & modules */
     int continous_failures_count_{0};
 
     void updateTrajInfo(const UniformBspline &position_traj, const ros::Time time_now);

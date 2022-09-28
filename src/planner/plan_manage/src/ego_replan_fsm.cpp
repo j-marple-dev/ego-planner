@@ -247,7 +247,7 @@ namespace ego_planner
 
     bool success = false;
     end_pt_ << msg.poses[0].pose.position.x, msg.poses[0].pose.position.y, odom_pos_(2);// msg.poses[0].pose.position.z;
-    // end_pt_ << checkEnableWaypoint(odom_pos_, {msg.poses[0].pose.position.x, msg.poses[0].pose.position.y, msg.poses[0].pose.position.z});
+    end_pt_ << checkEnableWaypoint(odom_pos_, end_pt_);
     success = planner_manager_->planGlobalTraj(odom_pos_, odom_vel_, Eigen::Vector3d::Zero(), end_pt_, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
 
     visualization_->displayGoalPoint(end_pt_, Eigen::Vector4d(0, 0.5, 0.5, 1), 0.3, 0);
@@ -389,12 +389,12 @@ namespace ego_planner
       if (timesOfConsecutiveStateCalls().first == 1)
       {
         flag_random_poly_init = false;
-        planner_manager_->grid_map_->setSearchAreaH();
+        // planner_manager_->grid_map_->setSearchAreaH();
       }
       else
       {
         flag_random_poly_init = true;
-        planner_manager_->grid_map_->resetSearchArea();
+        // planner_manager_->grid_map_->resetSearchArea();
       }
 
       bool success = callReboundReplan(true, flag_random_poly_init);
@@ -579,17 +579,110 @@ namespace ego_planner
   }
 
   Eigen::Vector3d EGOReplanFSM::checkEnableWaypoint(const Eigen::Vector3d &start, const Eigen::Vector3d &waypoint) {
-    auto map = planner_manager_->grid_map_;
-    Eigen::Vector3d direction = (waypoint - start).normalized();
-
-    for (double d = (waypoint - start).norm(); d > 0; d -= map->getResolution() * 0.5) {
-      Eigen::Vector3d point = start + direction * d;
-      if (map->getInflateSecondaryOccupancy(point) == 0) {
-        return point;
+ros::Time time_1 = ros::Time::now();
+    vector<vector<Eigen::Vector3d>> a_star_pathes;
+    vector<Eigen::Vector3d> a_star_path_H, a_star_path_V, a_star_path_A;
+    double expected_length = (waypoint - start).norm() / planner_manager_->grid_map_->getResolution();
+    
+    if (expected_length > 1) {
+      planner_manager_->grid_map_->setSearchAreaH();
+      if (planner_manager_->bspline_optimizer_rebound_->a_star_->AstarSearch(0.1, odom_pos_, end_pt_)) {
+        a_star_path_H = planner_manager_->bspline_optimizer_rebound_->a_star_->getPath();
       }
     }
-    
-    return start;
+
+    if (a_star_path_H.size() > expected_length * 1.1) {
+      planner_manager_->grid_map_->setSearchAreaV(end_pt_);
+      if (planner_manager_->bspline_optimizer_rebound_->a_star_->AstarSearch(0.1, odom_pos_, end_pt_)) {
+        a_star_path_V = planner_manager_->bspline_optimizer_rebound_->a_star_->getPath();
+      }
+    }
+
+    if (a_star_path_V.size() > expected_length * 1.1 || (a_star_path_V.size() == 0 && a_star_path_H.size() > expected_length * 1.1))
+    {
+      planner_manager_->grid_map_->resetSearchArea();
+      if (planner_manager_->bspline_optimizer_rebound_->a_star_->AstarSearch(0.1, odom_pos_, end_pt_)) {
+        a_star_path_A = planner_manager_->bspline_optimizer_rebound_->a_star_->getPath();
+      }
+    }
+
+    a_star_pathes.push_back(a_star_path_H);
+    a_star_pathes.push_back(a_star_path_V);
+    a_star_pathes.push_back(a_star_path_A);
+
+    planner_manager_->visualization_->displayAStarList(a_star_pathes, 0);
+    planner_manager_->grid_map_->resetSearchArea();
+
+ros::Time time_2 = ros::Time::now();
+// compute time check
+std::cout << "AstarSearch time : " << (time_2 - time_1).toSec() << std::endl;
+std::cout << "expected : " << (waypoint - start).norm() << ", ";
+std::cout << "H : " << a_star_path_H.size() << ", ";
+std::cout << "V : " << a_star_path_V.size() << ", ";
+std::cout << "A : " << a_star_path_A.size() << std::endl;
+    return waypoint;
+
+    // // find obstacle in corner
+    // if (a_star_pathes.size() > 0 && a_star_pathes.front().size() > 2) {
+    //   auto a_star_path = a_star_pathes.front();
+    //   vector<Eigen::Vector3i> path_dirs;
+
+    //   for (size_t i = 1; i < a_star_path.size(); i++) {
+    //     Eigen::Vector3i ipos_1, ipos_2;
+    //     planner_manager_->grid_map_->posToIndex(a_star_path[i-1], ipos_1);
+    //     planner_manager_->grid_map_->posToIndex(a_star_path[i], ipos_2);
+    //     path_dirs.push_back(ipos_2 - ipos_1);
+    //   }
+
+    //   bool is_left = false;
+    //   bool is_right = false;
+    //   auto map = planner_manager_->grid_map_;
+
+    //   for (size_t i = 1; i < path_dirs.size(); i++) {
+    //     if (path_dirs[i].x() == 0 && path_dirs[i].y() == 0) continue;
+    //     Eigen::Vector3d path_pos = a_star_path[i];
+    //     if ((path_pos - odom_pos_).norm() < 1.0) continue;
+
+    //     double ang1 = atan2(path_dirs[i-1].y(), path_dirs[i-1].x());
+    //     double ang2 = atan2(path_dirs[i].y(), path_dirs[i].x());
+    //     double angle12 = ang2 - ang1;
+    //     if (angle12 > M_PI) angle12 -= M_PI;
+    //     if (angle12 < -M_PI) angle12 += M_PI;
+    //     if (angle12 > 0) {
+    //       is_left = true;
+    //       is_right = false;
+    //     } else if (angle12 < 0) {
+    //       is_left = false;
+    //       is_right = true;
+    //     }
+
+    //     if (is_left || is_right) {
+    //       Eigen::Vector3d offset(0, 0, 0);
+    //       if (is_left) {
+    //         offset.x() = -((double)path_dirs[i].y());
+    //         offset.y() = ((double)path_dirs[i].x());
+    //       } else if (is_right) {
+    //         offset.x() = ((double)path_dirs[i].y());
+    //         offset.y() = -((double)path_dirs[i].x());
+    //       }
+    //       offset = offset.normalized() * map->getResolution();
+
+    //       if (map->getInflateOccupancy(path_pos + offset)) {
+    //         int free_cell_count = 1;
+    //         int count_max = 12;
+    //         for (int count = 0; count <= count_max; count++) {
+    //           if (map->getInflateOccupancy(path_pos - ((double)free_cell_count) * offset))
+    //             break;
+    //           else
+    //             free_cell_count ++;
+    //         }
+    //         return path_pos - ((double)(free_cell_count / 2)) * offset;
+    //       }
+    //     }
+    //   }
+    // }
+
+    // return waypoint;
   }
 
   bool EGOReplanFSM::callReboundReplan(bool flag_use_poly_init, bool flag_randomPolyTraj)

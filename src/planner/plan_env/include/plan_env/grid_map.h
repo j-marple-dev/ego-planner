@@ -163,6 +163,7 @@ public:
 
   inline void resetSearchArea();
   inline void setSearchAreaH();
+  inline void setSearchAreaV(Eigen::Vector3d& end);
 
   inline void boundIndex(Eigen::Vector3i& id);
   inline bool isUnknown(const Eigen::Vector3i& id);
@@ -376,6 +377,18 @@ inline void GridMap::setSearchAreaH() {
   posToIndex(md_.camera_pos_, pos_i);
   md_.min_cut_.z() = max(md_.min_cut_.z(), pos_i.z() - 2);
   md_.max_cut_.z() = min(md_.max_cut_.z(), pos_i.z() + 2);
+}
+
+inline void GridMap::setSearchAreaV(Eigen::Vector3d& end) {
+  resetSearchArea();
+
+  Eigen::Vector3i pos_i, end_i;
+  posToIndex(md_.camera_pos_, pos_i);
+  posToIndex(end, end_i);
+  md_.min_cut_.x() = max(md_.min_cut_.x(), min(pos_i.x(), end_i.x()) - 5);
+  md_.max_cut_.x() = min(md_.max_cut_.x(), max(pos_i.x(), end_i.x()) + 5);
+  md_.min_cut_.y() = max(md_.min_cut_.y(), min(pos_i.y(), end_i.y()) - 5);
+  md_.max_cut_.y() = min(md_.max_cut_.y(), max(pos_i.y(), end_i.y()) + 5);
 }
 
 inline bool GridMap::isInMap(const Eigen::Vector3d& pos) {

@@ -188,7 +188,8 @@ void cmdCallback(const ros::TimerEvent &e)
     Eigen::Vector3d closestPoint = findClosestPoint(odom_pos_, traj_[0]);
     Eigen::Vector3d refTarget = findClosestPoint(closestPoint, traj_[0], forward_length_) + z_offset;
     Eigen::Vector3d refTarget_forward = findClosestPoint(closestPoint, traj_[0], forward_length_ * 2.5) + z_offset;
-    Eigen::Vector3d sub_vector(refTarget.x() - odom_pos_.x(), refTarget.y() - odom_pos_.y(), 0);
+    Eigen::Vector3d sub_vector(refTarget.x() - odom_pos_.x(), refTarget.y() - odom_pos_.y(), refTarget.z() - odom_pos_.z());
+    Eigen::Vector3d sub_vector_xy(refTarget.x() - odom_pos_.x(), refTarget.y() - odom_pos_.y(), 0);
     
     double ref_yaw = last_yaw_;
     if (enable_rotate_head_) {
@@ -244,10 +245,10 @@ void cmdCallback(const ros::TimerEvent &e)
       }
     }
 
-    if (sub_vector.norm() > 0.5) {
+    if (sub_vector_xy.norm() > 0.5) {
       msg.type_mask |= msg.IGNORE_YAW_RATE;
       msg.yaw = ref_yaw;
-    } else if (sub_vector.norm() < 0.1) {
+    } else if (sub_vector_xy.norm() < 0.1) {
       msg.type_mask |= msg.IGNORE_YAW;
       receive_traj_ = false;
       last_odom_pos_ = odom_pos_;

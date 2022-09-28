@@ -1,8 +1,11 @@
 import rospy
+import math
 
 from std_msgs.msg import String
 from mavros_msgs.srv import SetMode
 from mavros_msgs.srv import CommandBool
+from nav_msgs.msg import Path, Odometry
+from geometry_msgs.msg import PoseStamped
 
 
 class ControlMessage:
@@ -23,6 +26,78 @@ class ControlMessage:
         msg = String()
         msg.data = "{roll},{pitch},{yaw},{throttle}".format(roll=roll,pitch=pitch,yaw=yaw,throttle=throttle)
         self.control_pub.publish(msg)
+
+
+class WaypointMessage:
+    """Send waypoint message via MavROS"""
+
+    def __init__(self) -> None:
+        self.waypoint_pub = rospy.Publisher('/waypoint_generator/waypoints',
+                                            Path,
+                                            queue_size=1)
+        self.odom_sub = rospy.Subscriber('/Odometry',
+                                         Odometry,
+                                         self.callback_odometry)
+        self._timer_send_waypoint = rospy.Timer(rospy.Duration(0.1), self._loop_send_waypoint)
+        self.distance_tolerance = 0.5
+
+        self.current_position = Odometry()
+        self.target_position = PoseStamped()
+        self.is_moving = False
+        self.waypoints = []
+        self.send_seq = 0
+
+    def add_waypoint(self, x: float, y: float, z: float) -> None:
+        self.waypoints.append((x, y, z))
+
+    def _check_current_location(self) -> bool:
+        if len(self.waypoints) < 1:
+            return False
+
+        target_point = self.target_position.pose.position
+        current_point = self.current_position.pose.pose.position
+
+        distance = math.sqrt(math.pow(target_point.x - current_point.x, 2) + math.pow(target_point.y - current_point.y, 2) + math.pow(target_point.z - current_point.z, 2))
+
+        if distance < self.distance_tolerance:
+            return True
+
+        return False
+
+    def _loop_send_waypoint(self, event = None) -> None:
+        if self.is_moving and not self._check_current_location():
+            return
+        else:
+            self.is_moving = False
+
+        if len(self.waypoints) < 1:
+            return
+
+        self.send_seq += 1
+
+        target_point = self.waypoints.pop(0)
+
+        msg = Path()
+        msg.header.seq = self.send_seq
+        msg.header.stamp = rospy.Time.now()
+        msg.header.frame_id = "map"
+
+        pose = PoseStamped()
+        pose.header.seq = self.send_seq
+        pose.header.stamp = rospy.Time.now()
+        pose.header.frame_id = "map"
+        pose.pose.position.x = target_point[0]
+        pose.pose.position.y = target_point[1]
+        pose.pose.position.z = target_point[2]
+        pose.pose.orientation.w = 1.0
+        msg.poses.append(pose)
+        self.target_position = pose
+
+        self.waypoint_pub.publish(msg)
+        self.is_moving = True
+
+    def callback_odometry(self, msg: Odometry) -> None:
+        self.current_position = msg
 
 
 class MAVROSCommander:

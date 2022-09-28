@@ -1,6 +1,8 @@
 import rospy
 import math
 
+from typing import Tuple, List
+
 from std_msgs.msg import String
 from mavros_msgs.srv import SetMode
 from mavros_msgs.srv import CommandBool
@@ -47,8 +49,17 @@ class WaypointMessage:
         self.waypoints = []
         self.send_seq = 0
 
+    def clear_waypoint(self) -> None:
+        self.waypoints.clear()
+        self.target_position.pose = self.current_position.pose.pose
+        self.is_moving = False
+
     def add_waypoint(self, x: float, y: float, z: float) -> None:
         self.waypoints.append((x, y, z))
+
+    def add_waypoints(self, points: List[Tuple[float, float, float]]) -> None:
+        for point in points:
+            self.add_waypoint(*point)
 
     def _check_current_location(self) -> bool:
         if len(self.waypoints) < 1:

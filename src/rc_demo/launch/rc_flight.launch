@@ -1,9 +1,11 @@
 <launch>
     <arg name="rc_control" default="false" doc="Use RC to set the waypoint" />
     <arg name="waypoint" default="$(find rc_demo)/res/waypoints.yaml" doc="Waypoint definition yaml file." />
+    <arg name="target_waypoint" default="waypoint_0" doc="Target waypoint name to use defined in yaml file." />
 
     <node pkg="rc_demo" type="rc_flight.py" name="rc_flight" output="screen" required="true">
         <param name="rc_control" value="$(arg rc_control)" />
         <param name="waypoint" value="$(arg waypoint)" />
+        <param name="target_waypoint" value="$(arg target_waypoint)" />
     </node>
 </launch>

@@ -2,17 +2,21 @@
 
 import sys
 import rospy
+import yaml
+import time
 
 from mavros_msgs.msg import RCIn
 
-from utils import ControlMessage
+from utils import ControlMessage, WaypointMessage
 
 class RCHandler:
     """Receieve RC stick data."""
 
-    def __init__(self) -> None:
+    def __init__(self, use_rc_control: bool = True, waypoint_path: str = "") -> None:
+        self.use_rc_control = use_rc_control
         self.rc_sub = rospy.Subscriber("/mavros/rc/in", RCIn, self.callback_rc_in)
         self.control_msg = ControlMessage()
+        self.waypoint_msg = WaypointMessage()
 
         self.is_calibrated = False
         self.calib_count = 0
@@ -25,6 +29,19 @@ class RCHandler:
         self.throttle = 0.0
 
         self.cmd_magnitude = 1.0
+
+        if waypoint_path != "":
+            with open(waypoint_path, 'r') as f:
+                self.waypoints = yaml.load(f, yaml.SafeLoader)
+        else:
+            self.waypoints = {
+                'waypoint_0': [[0.0, 0.0, 1.2]],
+                'waypoint_1': [[0.0, 0.0, 1.2]],
+            }
+
+        time.sleep(3)
+        for waypoint in self.waypoints['waypoint_0']:
+            self.waypoint_msg.add_waypoint(*waypoint)
 
 
     def callback_rc_in(self, msg: RCIn) -> None:
@@ -64,7 +81,7 @@ class RCHandler:
         else:
             self.calib_count = 0
 
-        if not self.is_calibrated:
+        if not self.is_calibrated or not self.use_rc_control:
             return
 
         self.control_msg.send_control(-self.roll * self.cmd_magnitude,
@@ -76,8 +93,10 @@ class RCHandler:
 if __name__ == "__main__":
     args = rospy.myargv(argv=sys.argv)
     rospy.init_node("flight_control_node", anonymous=True)
+    use_rc_control = rospy.get_param('~rc_control', False)
+    waypoint_path = rospy.get_param('~waypoint', "")
 
-    rc_handler = RCHandler()
+    rc_handler = RCHandler(use_rc_control, waypoint_path)
 
     rospy.spin()
 

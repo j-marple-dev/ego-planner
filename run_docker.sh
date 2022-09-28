@@ -57,31 +57,16 @@ elif [ "$1" = "run" ]; then
         CMD_ARGS="$CMD_ARGS --gpus all"
     fi
 
-    # TODO(ulken94): The LIO-Livox should not be mounted for aarch64.
-    if [ "$ARCH" = "aarch64" ]; then
-        docker run $DOCKER_OPT --privileged \
-            -e DISPLAY=${DISPLAY} \
-            -e TERM=xterm-256color \
-            -v /tmp/.X11-unix:/tmp/.X11-unix:ro \
-            -v /dev:/dev \
-            -v $PWD/src:/home/user/catkin_ws/src \
-            --network host \
-            $CMD_ARGS \
-            $DOCKER_TAG \
-            $RUN_SHELL
-    else
-        docker run $DOCKER_OPT --privileged \
-            -e DISPLAY=${DISPLAY} \
-            -e TERM=xterm-256color \
-            -v /tmp/.X11-unix:/tmp/.X11-unix:ro \
-            -v /dev:/dev \
-            -v $PWD/catkin_ws/src:/home/user/catkin_ws/src \
-            -v $PWD/res:/home/user/res \
-            --network host \
-            $CMD_ARGS \
-            $DOCKER_TAG \
-            $RUN_SHELL
-    fi
+    docker run $DOCKER_OPT --privileged \
+        -e DISPLAY=${DISPLAY} \
+        -e TERM=xterm-256color \
+        -v /tmp/.X11-unix:/tmp/.X11-unix:ro \
+        -v /dev:/dev \
+        -v $PWD/src:/home/user/catkin_ws/src \
+        --network host \
+        $CMD_ARGS \
+        $DOCKER_TAG \
+        $RUN_SHELL
 
     last_cont_id=$(docker ps -qn 1)
     echo $(docker ps -qn 1) > $PWD/.last_exec_cont_id.txt

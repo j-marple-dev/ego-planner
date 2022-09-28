@@ -246,7 +246,7 @@ namespace ego_planner
     init_pt_ = odom_pos_;
 
     bool success = false;
-    end_pt_ << msg.poses[0].pose.position.x, msg.poses[0].pose.position.y, odom_pos_(2);// msg.poses[0].pose.position.z;
+    end_pt_ << msg.poses[0].pose.position.x, msg.poses[0].pose.position.y, msg.poses[0].pose.position.z;
     end_pt_ << checkEnableWaypoint(odom_pos_, end_pt_);
     success = planner_manager_->planGlobalTraj(odom_pos_, odom_vel_, Eigen::Vector3d::Zero(), end_pt_, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
 

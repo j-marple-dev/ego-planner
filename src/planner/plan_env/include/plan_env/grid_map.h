@@ -338,6 +338,7 @@ inline int GridMap::getInflateOccupancy(Eigen::Vector3d pos) {
 
   if (!isInBoundary(id)) return 1;
 
+  // TODO: return int(md_.occupancy_buffer_inflate_[toAddress(id)]);
   return int(md_.occupancy_buffer_inflate_secondary_[toAddress(id)]);
 }
 

@@ -17,9 +17,12 @@ waypoint_1:
   ]
 
 waypoint_outdoor:
+# This way point has been set from roslaunch simulation_environment mavros_posix_sitl_lidar.launch world:=$HOME/custom_worlds/add_competition_outfield.world x:=10.5 y:=-1 z:=1 vehicle:=px4vision lidar:=ouster
   [
     [3.72308462946, 2.16384181223, 1.59992909121],  # first plants
-    [6.40119367623, 2.13588568156, 1.61656869656],  # second plants
-    [9.9070259193, 2.08961550795, 3.63913609922],   # wall
-    [14.3681804363, -0.725301411499, 1.00505519304]   # net
+    [7.20119367623, 2.13588568156, 2.61656869656],  # second plants
+    [12.7070259193, 2.08961550795, 2.43913609922],   # wall
+    [14.3681804363, -0.525301411499, 1.50505519304],   # before net
+    [17.8681804363, -0.525301411499, 1.50505519304],   # after net
+    [25, 0.00, 1.8005]  # car
   ]

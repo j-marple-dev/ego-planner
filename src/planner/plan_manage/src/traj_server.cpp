@@ -108,7 +108,7 @@ void customTrajCallback(visualization_msgs::MarkerConstPtr msg)
     
     UniformBspline pos_traj(pos_pts, 3, 1.0);
 
-    if (pos_traj.getTimeSum() > 0 && pos_traj.getLength(0.02) > forward_length_) {
+    if (pos_traj.getTimeSum() > 0) {
       start_time_ = ros::Time::now();
       traj_.clear();
       traj_.push_back(pos_traj);

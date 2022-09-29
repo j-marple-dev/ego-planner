@@ -460,6 +460,7 @@ namespace ego_planner
       {
         // cout << "near end" << endl;
         traj_pts_.push_back(end_pt_);
+        if (traj_pts_.size() == 2) traj_pts_.push_back(end_pt_);
         visualization_->displayTrajList(traj_pts_, 0);
         current_traj_ = generateTraj(traj_pts_);
         return;

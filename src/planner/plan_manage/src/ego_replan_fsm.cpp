@@ -245,12 +245,23 @@ namespace ego_planner
     trigger_ = true;
     init_pt_ = odom_pos_;
 
-    bool success = false;
     end_pt_ << msg.poses[0].pose.position.x, msg.poses[0].pose.position.y, msg.poses[0].pose.position.z;
-    end_pt_ << checkEnableWaypoint(odom_pos_, end_pt_);
-    success = planner_manager_->planGlobalTraj(odom_pos_, odom_vel_, Eigen::Vector3d::Zero(), end_pt_, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
 
+    Eigen::Vector3d sub_xy(end_pt_.x() - init_pt_.x(), end_pt_.y() - init_pt_.y(), 0);
+    if (sub_xy.norm() < no_replan_thresh_ && abs(end_pt_.z() - init_pt_.z()) > 0.1) {
+      traj_pts_.clear();
+      traj_pts_.push_back(init_pt_);
+      traj_pts_.push_back(end_pt_);
+      traj_pts_.push_back(end_pt_);
+      visualization_->displayTrajList(traj_pts_, 0);
+      visualization_->displayGoalPoint(end_pt_, Eigen::Vector4d(0, 0.5, 0.5, 1), 0.3, 0);
+      return;
+    }
+
+    end_pt_ << checkEnableWaypoint(odom_pos_, end_pt_);
     visualization_->displayGoalPoint(end_pt_, Eigen::Vector4d(0, 0.5, 0.5, 1), 0.3, 0);
+
+    bool success = planner_manager_->planGlobalTraj(odom_pos_, odom_vel_, Eigen::Vector3d::Zero(), end_pt_, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
 
     if (success)
     {

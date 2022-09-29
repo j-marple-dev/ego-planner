@@ -184,7 +184,7 @@ void cmdCallback(const ros::TimerEvent &e)
 
   /* check receive traj_ before calculate target */
   if (receive_traj_) {
-    Eigen::Vector3d z_offset = Eigen::Vector3d(0, 0, 0.1);
+    Eigen::Vector3d z_offset = Eigen::Vector3d(0, 0, 0);
     Eigen::Vector3d closestPoint = findClosestPoint(odom_pos_, traj_[0]);
     Eigen::Vector3d refTarget = findClosestPoint(closestPoint, traj_[0], forward_length_) + z_offset;
     Eigen::Vector3d refTarget_forward = findClosestPoint(closestPoint, traj_[0], forward_length_ * 2.5) + z_offset;
@@ -237,18 +237,12 @@ void cmdCallback(const ros::TimerEvent &e)
       msg.velocity.x = refVel.x();
       msg.velocity.y = refVel.y();
       msg.velocity.z = refVel.z();
-
-      if ((ros::Time::now() - start_time_).toSec() < 1.0) {
-        msg.velocity.x = 0.0;
-        msg.velocity.y = 0.0;
-        msg.velocity.z = 0.0;
-      }
     }
 
     if (sub_vector_xy.norm() > 0.5) {
       msg.type_mask |= msg.IGNORE_YAW_RATE;
       msg.yaw = ref_yaw;
-    } else if (sub_vector_xy.norm() < 0.1) {
+    } else if (sub_vector.norm() < 0.1) {
       msg.type_mask |= msg.IGNORE_YAW;
       receive_traj_ = false;
       last_odom_pos_ = odom_pos_;

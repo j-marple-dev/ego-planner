@@ -33,7 +33,7 @@ class ControlMessage:
 class WaypointMessage:
     """Send waypoint message via MavROS"""
 
-    def __init__(self) -> None:
+    def __init__(self, distance_tolerance: float = 0.5) -> None:
         self.waypoint_pub = rospy.Publisher('/waypoint_generator/waypoints',
                                             Path,
                                             queue_size=1)
@@ -42,7 +42,7 @@ class WaypointMessage:
                                          self.callback_odometry)
         self._timer_send_waypoint = rospy.Timer(rospy.Duration(3.0),
                                                 self._loop_send_waypoint)
-        self.distance_tolerance = 0.5
+        self.distance_tolerance = distance_tolerance
 
         self.current_position = Odometry()
         self.target_position = PoseStamped()

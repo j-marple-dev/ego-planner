@@ -3,8 +3,10 @@
   <arg name="map_size_x" value="150.0"/>
   <arg name="map_size_y" value="150.0"/>
   <arg name="map_size_z" value=" 10.0"/>
+
   <arg name="waypoint" default="$(find rc_demo)/res/waypoints.yaml" doc="Waypoint definition yaml file." />
   <arg name="target_waypoint" default="waypoint_0" doc="Target waypoint name to use defined in yaml file." />
+  <arg name="arrive_tolerance" default="0.5" doc="Waypoint arrive tolerance distance in meter." />
 
   <!-- topic of your odometry such as VIO or LIO -->
   <arg name="odom_topic" value="/Odometry" />
@@ -94,6 +96,7 @@
     <arg name="rc_control" value="false" />
     <arg name="waypoint" value="$(arg waypoint)" />
     <arg name="target_waypoint" value="$(arg target_waypoint)" />
+    <arg name="arrive_tolerance" value="$(arg arrive_tolerance)" />
   </include>
 
   <!-- use simulator -->

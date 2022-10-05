@@ -39,6 +39,8 @@ double time_forward_;
 bool use_velocity_control_, enable_rotate_head_;
 double forward_length_;
 
+double max_vel_;
+
 void bsplineCallback(ego_planner::BsplineConstPtr msg)
 {
   // parse pos traj
@@ -229,10 +231,9 @@ void cmdCallback(const ros::TimerEvent &e)
       msg.type_mask |= msg.IGNORE_PX | msg.IGNORE_PY | msg.IGNORE_PZ;
 
       double alpha = 0.5;
-      double max_velocity = 1.0;
 
       Eigen::Vector3d refVel = alpha * (refTarget - odom_pos_) + (1.0 - alpha) * (closestPoint - odom_pos_);
-      refVel = refVel * (min(sub_vector.norm(), max_velocity) / refVel.norm());
+      refVel = refVel * (min(sub_vector.norm(), max_vel_) / refVel.norm());
 
       msg.velocity.x = refVel.x();
       msg.velocity.y = refVel.y();
@@ -336,6 +337,7 @@ int main(int argc, char **argv)
   nh.param("traj_server/use_velocity_control", use_velocity_control_, false);
   nh.param("traj_server/forward_length", forward_length_, 1.0);
   nh.param("traj_server/enable_rotate_head", enable_rotate_head_, true);
+  nh.param("traj_server/max_vel", max_vel_, 1.0);
 
   ros::Duration(1.0).sleep();
 

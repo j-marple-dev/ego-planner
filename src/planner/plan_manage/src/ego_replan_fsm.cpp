@@ -614,7 +614,7 @@ ros::Time time_1 = ros::Time::now();
       /* ---------- all inflate ---------- */
       for (int x = -step; x <= step; ++x)
         for (int y = -step; y <= step; ++y)
-          for (int z = -1; z <= 1; ++z) {
+          for (int z = -step/2; z <= step/2; ++z) {
             if (sqrt(x*x + y*y + z*z) > (double)step) continue;
             Eigen::Vector3d new_pt(pt(0) + (double)x * res, pt(1) + (double)y * res, pt(2) + (double)z * res);
             if (!map->getInflateOccupancy(new_pt)) {

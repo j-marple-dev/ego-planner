@@ -7,7 +7,12 @@ from std_msgs.msg import String
 from mavros_msgs.srv import SetMode
 from mavros_msgs.srv import CommandBool
 from nav_msgs.msg import Path, Odometry
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Pose
+from visualization_msgs.msg import Marker
+
+
+def compute_distance(x: Pose, y: Pose) -> float:
+    return math.sqrt(math.pow(x.x - y.x, 2) + math.pow(x.y - y.y, 2) + math.pow(x.z - y.z, 2))
 
 
 class ControlMessage:
@@ -40,6 +45,9 @@ class WaypointMessage:
         self.odom_sub = rospy.Subscriber('/Odometry',
                                          Odometry,
                                          self.callback_odometry)
+        self.goal_point_sub = rospy.Subscriber('/ego_planner_node/goal_point',
+                                               Marker,
+                                               self.callback_goal_point)
         self._timer_send_waypoint = rospy.Timer(rospy.Duration(3.0),
                                                 self._loop_send_waypoint)
         self.distance_tolerance = distance_tolerance
@@ -69,7 +77,7 @@ class WaypointMessage:
         target_point = self.target_position.pose.position
         current_point = self.current_position.pose.pose.position
 
-        distance = math.sqrt(math.pow(target_point.x - current_point.x, 2) + math.pow(target_point.y - current_point.y, 2) + math.pow(target_point.z - current_point.z, 2))
+        distance = compute_distance(target_point, current_point)
 
         if distance < self.distance_tolerance:
             return True
@@ -117,6 +125,14 @@ class WaypointMessage:
 
         if self.target_position.pose.position.x == 0 and self.target_position.pose.position.y == 0 and self.target_position.pose.position.z == 0:
             self.target_position.pose = msg.pose.pose
+
+    def callback_goal_point(self, msg: Marker) -> None:
+        if msg.id != 1:
+            return
+
+        position = msg.pose.position
+        if compute_distance(msg.pose.position, self.target_position.pose.position) < self.distance_tolerance:
+            self.target_position.pose = msg.pose
 
 
 class MAVROSCommander:

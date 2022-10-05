@@ -242,7 +242,7 @@ void cmdCallback(const ros::TimerEvent &e)
     if (sub_vector_xy.norm() > 0.5) {
       msg.type_mask |= msg.IGNORE_YAW_RATE;
       msg.yaw = ref_yaw;
-    } else if (sub_vector.norm() < 0.1) {
+    } else if (sub_vector_xy.norm() < 0.1) {
       msg.type_mask |= msg.IGNORE_YAW;
       receive_traj_ = false;
       last_odom_pos_ = odom_pos_;

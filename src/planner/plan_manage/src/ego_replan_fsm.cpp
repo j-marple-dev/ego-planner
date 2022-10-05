@@ -243,7 +243,7 @@ namespace ego_planner
 
     cout << "Triggered!" << endl;
     trigger_ = true;
-    init_pt_ = odom_pos_;
+    init_pt_ = checkEnableStartpoint(odom_pos_);
 
     end_pt_ << msg.poses[0].pose.position.x, msg.poses[0].pose.position.y, msg.poses[0].pose.position.z;
     visualization_->displayGoalPoint(end_pt_, Eigen::Vector4d(0.25, 1.0, 0.25, 0.7), 0.3, 0);
@@ -259,10 +259,10 @@ namespace ego_planner
       return;
     }
 
-    end_pt_ << checkEnableWaypoint(odom_pos_, end_pt_);
+    end_pt_ << checkEnableWaypoint(init_pt_, end_pt_);
     visualization_->displayGoalPoint(end_pt_, Eigen::Vector4d(0.25, 0.25, 1.0, 0.7), 0.3, 1);
 
-    bool success = planner_manager_->planGlobalTraj(odom_pos_, odom_vel_, Eigen::Vector3d::Zero(), end_pt_, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
+    bool success = planner_manager_->planGlobalTraj(init_pt_, odom_vel_, Eigen::Vector3d::Zero(), end_pt_, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
 
     if (success)
     {
@@ -387,7 +387,7 @@ namespace ego_planner
 
     case GEN_NEW_TRAJ:
     {
-      start_pt_ = odom_pos_;
+      start_pt_ = init_pt_;
       start_vel_ = odom_vel_;
       start_acc_.setZero();
       traj_pts_.clear();
@@ -602,6 +602,48 @@ namespace ego_planner
     // }
   }
 
+  Eigen::Vector3d EGOReplanFSM::checkEnableStartpoint(const Eigen::Vector3d &start) {
+    // first, check is waypoint validate
+    auto map = planner_manager_->grid_map_;
+    auto inflatePointWithoutObs = [map](const Eigen::Vector3d& pt, int step, vector<Eigen::Vector3d>& pts) {
+      pts.clear();
+      double res = map->getResolution();
+      /* ---------- all inflate ---------- */
+      for (int x = -step; x <= step; ++x)
+        for (int y = -step; y <= step; ++y)
+          for (int z = -step; z <= step; ++z) {
+            if (sqrt(x*x + y*y + z*z) > (double)step) continue;
+            Eigen::Vector3d new_pt(pt(0) + (double)x * res, pt(1) + (double)y * res, pt(2) + (double)z * res);
+            if (!map->getInflateOccupancy(new_pt)) {
+              pts.push_back(new_pt);
+            }
+          }
+    };
+
+    int inf_step = 2; // TODO: add inf_step parameter for this function
+    vector<Eigen::Vector3d> inf_pts;
+    inflatePointWithoutObs(start, inf_step, inf_pts);
+
+    if (inf_pts.size() > 0) {
+      double best_score = inf_pts.size();
+      Eigen::Vector3d best_pt = start;
+
+      for (auto inf_pt : inf_pts) {
+        vector<Eigen::Vector3d> inf_pts_sub;
+        inflatePointWithoutObs(inf_pt, inf_step, inf_pts_sub);
+        double score = (double)inf_pts_sub.size();
+        if (score > best_score) {
+          best_pt = inf_pt;
+          best_score = score;
+        }
+      }
+
+      return best_pt;
+    }
+    
+    return start;
+  }
+
   Eigen::Vector3d EGOReplanFSM::checkEnableWaypoint(const Eigen::Vector3d &start, const Eigen::Vector3d &end) {
     Eigen::Vector3d waypoint = end;
 
@@ -681,14 +723,14 @@ ros::Time time_2 = ros::Time::now();
     
     if (expected_length > 1) {
       planner_manager_->grid_map_->setSearchAreaH();
-      if (planner_manager_->bspline_optimizer_rebound_->a_star_->AstarSearch(0.1, odom_pos_, waypoint)) {
+      if (planner_manager_->bspline_optimizer_rebound_->a_star_->AstarSearch(0.1, start, waypoint)) {
         a_star_path_H = planner_manager_->bspline_optimizer_rebound_->a_star_->getPath();
       }
     }
 
     if (a_star_path_H.size() > expected_length * 1.1 || a_star_path_H.size() == 0) {
       planner_manager_->grid_map_->setSearchAreaV(waypoint);
-      if (planner_manager_->bspline_optimizer_rebound_->a_star_->AstarSearch(0.1, odom_pos_, waypoint)) {
+      if (planner_manager_->bspline_optimizer_rebound_->a_star_->AstarSearch(0.1, start, waypoint)) {
         a_star_path_V = planner_manager_->bspline_optimizer_rebound_->a_star_->getPath();
       }
     }
@@ -696,7 +738,7 @@ ros::Time time_2 = ros::Time::now();
     if (a_star_path_V.size() > expected_length * 1.1 || (a_star_path_V.size() == 0 && a_star_path_H.size() > expected_length * 1.1) || a_star_path_H.size() == 0)
     {
       planner_manager_->grid_map_->resetSearchArea();
-      if (planner_manager_->bspline_optimizer_rebound_->a_star_->AstarSearch(0.1, odom_pos_, waypoint)) {
+      if (planner_manager_->bspline_optimizer_rebound_->a_star_->AstarSearch(0.1, start, waypoint)) {
         a_star_path_A = planner_manager_->bspline_optimizer_rebound_->a_star_->getPath();
       }
     }

@@ -3,11 +3,13 @@
     <arg name="waypoint" default="$(find rc_demo)/res/waypoints.yaml" doc="Waypoint definition yaml file." />
     <arg name="target_waypoint" default="waypoint_outdoor" doc="Target waypoint name to use defined in yaml file." />
     <arg name="arrive_tolerance" default="0.5" doc="Waypoint arrive tolerance distance in meter." />
+    <arg name="check_yaw" default="true" doc="Check yaw difference or not." />
 
     <node pkg="rc_demo" type="rc_flight.py" name="rc_flight" output="screen" required="true">
         <param name="rc_control" value="$(arg rc_control)" />
         <param name="waypoint" value="$(arg waypoint)" />
         <param name="target_waypoint" value="$(arg target_waypoint)" />
         <param name="arrive_tolerance" value="$(arg arrive_tolerance)" />
+        <param name="check_yaw" value="$(arg check_yaw)" />
     </node>
 </launch>

@@ -95,7 +95,11 @@ class ControlMessage:
 class WaypointMessage:
     """Send waypoint message via MavROS"""
 
-    def __init__(self, distance_tolerance: float = 0.5) -> None:
+    def __init__(
+        self,
+        distance_tolerance: float = 0.5,
+        check_yaw: bool = True,
+    ) -> None:
         self.waypoint_pub = rospy.Publisher('/waypoint_generator/waypoints',
                                             Path,
                                             queue_size=1)
@@ -108,6 +112,7 @@ class WaypointMessage:
         self._timer_send_waypoint = rospy.Timer(rospy.Duration(3.0),
                                                 self._loop_send_waypoint)
         self.distance_tolerance = distance_tolerance
+        self.check_yaw = check_yaw
 
         self.current_position = Odometry()
         """Target position is the designated waypoint"""
@@ -165,8 +170,12 @@ class WaypointMessage:
             rospy.loginfo(f"[   GOAL POSE] x: {goal_point.position.x:8.3f}, y: {goal_point.position.y:8.3f}, z: {goal_point.position.z:8.3f}, R: {rpy_goal[0]:8.3f}, P: {rpy_goal[1]:8.3f}, Y: {rpy_goal[2]:8.3f}")
             rospy.loginfo(f"[CURRENT POSE] x: {current_point.position.x:8.3f}, y: {current_point.position.y:8.3f}, z: {current_point.position.z:8.3f}, R: {rpy_current[0]:8.3f}, P: {rpy_current[1]:8.3f}, Y: {rpy_current[2]:8.3f}")
 
-        if distance < self.distance_tolerance and yaw_diff < (self.distance_tolerance * 10):
-            return True
+        if self.check_yaw:
+            if distance < self.distance_tolerance and yaw_diff < (self.distance_tolerance * 10):
+                return True
+        else:
+            if distance < self.distance_tolerance:
+                return True
 
         return False
 

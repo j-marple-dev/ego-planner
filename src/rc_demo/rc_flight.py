@@ -20,14 +20,15 @@ class RCHandler:
                  use_rc_control: bool = True,
                  waypoint_path: str = "",
                  target_waypoint: str = "waypoint_0",
-                 arrive_tolerance: float = 0.5) -> None:
+                 arrive_tolerance: float = 0.5,
+                 check_yaw: bool = True) -> None:
         self.use_rc_control = use_rc_control
         self.target_waypoint = target_waypoint
 
         self.rc_sub = rospy.Subscriber("/mavros/rc/in", RCIn, self.callback_rc_in)
         self.waypoint_trigger_sub = rospy.Subscriber("/custom/waypoint_trigger", String, self.callback_waypoint_trigger)
         self.control_msg = ControlMessage()
-        self.waypoint_msg = WaypointMessage(arrive_tolerance)
+        self.waypoint_msg = WaypointMessage(arrive_tolerance, check_yaw)
 
         self.is_waypoint_working = False
 
@@ -149,8 +150,9 @@ if __name__ == "__main__":
     waypoint_path = rospy.get_param('~waypoint', "")
     target_waypoint = rospy.get_param('~target_waypoint', "waypoint_0")
     arrive_tolerance = rospy.get_param('~arrive_tolerance', 0.5)
+    check_yaw = rospy.get_param("~check_yaw", True)
 
-    rc_handler = RCHandler(use_rc_control, waypoint_path, target_waypoint, arrive_tolerance)
+    rc_handler = RCHandler(use_rc_control, waypoint_path, target_waypoint, arrive_tolerance, check_yaw)
 
     rospy.spin()
 

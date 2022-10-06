@@ -25,14 +25,15 @@ class RCHandler:
                  offset_x: float = 0.0,
                  offset_y: float = 0.0,
                  offset_z: float = 0.0,
-                 offset_Y: float = 0.0) -> None:
+                 offset_Y: float = 0.0,
+                 check_yaw: bool = True) -> None:
         self.use_rc_control = use_rc_control
         self.target_waypoint = target_waypoint
 
         self.rc_sub = rospy.Subscriber("/mavros/rc/in", RCIn, self.callback_rc_in)
         self.waypoint_trigger_sub = rospy.Subscriber("/custom/waypoint_trigger", String, self.callback_waypoint_trigger)
         self.control_msg = ControlMessage()
-        self.waypoint_msg = WaypointMessage(distance_tolerance, angle_tolerance)
+        self.waypoint_msg = WaypointMessage(distance_tolerance, angle_tolerance, check_yaw)
         self.waypoint_msg.set_offset(offset_x, offset_y, offset_z, offset_Y)
 
         self.is_waypoint_working = False
@@ -156,13 +157,17 @@ if __name__ == "__main__":
     target_waypoint = rospy.get_param('~target_waypoint', "waypoint_0")
     distance_tolerance = rospy.get_param('~distance_tolerance', 0.5)
     angle_tolerance = rospy.get_param('~angle_tolerance', 10)
+
     offset_x = rospy.get_param('~offset_x', 0)
     offset_y = rospy.get_param('~offset_y', 0)
     offset_z = rospy.get_param('~offset_z', 0)
     offset_Y = rospy.get_param('~offset_Y', 0)
 
+    check_yaw = rospy.get_param("~check_yaw", True)
+    distance_tolerance = rospy.get_param('~distance_tolerance', 0.5)
+    angle_tolerance = rospy.get_param('~angle_tolerance', 10)
 
-    rc_handler = RCHandler(use_rc_control, waypoint_path, target_waypoint, distance_tolerance, angle_tolerance, offset_x, offset_y, offset_z, offset_Y)
+    rc_handler = RCHandler(use_rc_control, waypoint_path, target_waypoint, distance_tolerance, angle_tolerance, offset_x, offset_y, offset_z, offset_Y, check_yaw)
 
     rospy.spin()
 

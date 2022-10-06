@@ -4,10 +4,11 @@
     <arg name="target_waypoint" default="waypoint_outdoor" doc="Target waypoint name to use defined in yaml file." />
     <arg name="distance_tolerance" default="0.5" doc="Waypoint distance tolerance distance in meter." />
     <arg name="angle_tolerance" default="10.0" doc="Waypoint angle tolerance degrees." />
-    <arg name="offset_x" default="-2.5" doc="Offset x of the initial position" />
-    <arg name="offset_y" default="1.0" doc="Offset y of the initial position" />
+    <arg name="offset_x" default="0.0" doc="Offset x of the initial position" />
+    <arg name="offset_y" default="0.0" doc="Offset y of the initial position" />
     <arg name="offset_z" default="0.0" doc="Offset z of the initial position" />
-    <arg name="offset_Y" default="-11.45" doc="Offset yaw of the initial position" />
+    <arg name="offset_Y" default="0.0" doc="Offset yaw of the initial position" />
+    <arg name="check_yaw" default="true" doc="Check yaw difference or not." />
 
     <node pkg="rc_demo" type="rc_flight.py" name="rc_flight" output="screen" required="true">
         <param name="rc_control" value="$(arg rc_control)" />
@@ -19,5 +20,6 @@
         <param name="offset_y" value="$(arg offset_y)" />
         <param name="offset_z" value="$(arg offset_z)" />
         <param name="offset_Y" value="$(arg offset_Y)" />
+        <param name="check_yaw" value="$(arg check_yaw)" />
     </node>
 </launch>

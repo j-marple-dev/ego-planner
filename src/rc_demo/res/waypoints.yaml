@@ -55,8 +55,11 @@ waypoint_indoor2:
     [3.5, -0.9, 0.7],  # Right of stair
     [4.4, 1.3, 0.8],  # In front of stair
     [9.7, 1.6, 3.4],  # Middle of stair left
-    [9.7, -0.3, 3.6],  #  Middle of stair right
-    [3.6, -0.3, 5.7],  # 2nd floor
-    [1.77, -3.07, 5.7],  # first door
-    [5.88 , -2.87, 5.7],  # first door
+    [9.7, -0.4, 3.6],  #  Middle of stair right
+    [1.7, 0.2, 5.7],  # 2nd floor
+    [1.7, -0.8, 5.7, 90],  # In front of first door
+    [1.8, -4.07, 5.7],  # first door
+    [1.8, -4.07, 5.7, 0],  # first door left turn
+    [1.8, -4.07, 5.7, 90],  # first door
+    [3.58 , -7.87, 5.7, 180],  # in front of second door
   ]

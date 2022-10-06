@@ -170,6 +170,7 @@ class WaypointMessage:
         else:
             pose = target_point
 
+
         msg = Path()
         msg.header.seq = self.send_seq
         msg.header.stamp = rospy.Time.now()
@@ -177,6 +178,8 @@ class WaypointMessage:
         msg.poses.append(pose)
         self.target_position = pose
 
+        print(f"[CURRENT  WAYPOINT]: \n{pose.pose.position}")
+        print(f"[   ORIENTATION   ]: \n{pose.pose.orientation}")
         self.waypoint_pub.publish(msg)
         self.is_moving = True
 

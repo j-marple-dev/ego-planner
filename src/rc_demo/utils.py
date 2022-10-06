@@ -26,10 +26,20 @@ def get_quaternion_from_euler(roll: float, pitch: float, yaw: float) -> Tuple[fl
     Return:
         qx, qy, qz, qw: The orientation in quaternion [x,y,z,w] format
     """
-    qx = math.sin(roll/2) * math.cos(pitch/2) * math.cos(yaw/2) - math.cos(roll/2) * math.sin(pitch/2) * math.sin(yaw/2)
-    qy = math.cos(roll/2) * math.sin(pitch/2) * math.cos(yaw/2) + math.sin(roll/2) * math.cos(pitch/2) * math.sin(yaw/2)
-    qz = math.cos(roll/2) * math.cos(pitch/2) * math.sin(yaw/2) - math.sin(roll/2) * math.sin(pitch/2) * math.cos(yaw/2)
-    qw = math.cos(roll/2) * math.cos(pitch/2) * math.cos(yaw/2) + math.sin(roll/2) * math.sin(pitch/2) * math.sin(yaw/2)
+    sin_roll = math.sin(roll/2)
+    cos_roll = math.cos(roll/2)
+
+    sin_pitch = math.sin(pitch/2)
+    cos_pitch = math.cos(pitch/2)
+
+    sin_yaw = math.sin(yaw/2)
+    cos_yaw = math.cos(yaw/2)
+
+
+    qx = sin_roll * cos_pitch * cos_yaw - cos_roll * sin_pitch * sin_yaw
+    qy = cos_roll * sin_pitch * cos_yaw + sin_roll * cos_pitch * sin_yaw
+    qz = cos_roll * cos_pitch * sin_yaw - sin_roll * sin_pitch * cos_yaw
+    qw = cos_roll * cos_pitch * cos_yaw + sin_roll * sin_pitch * sin_yaw
 
     return (qx, qy, qz, qw)
 
@@ -102,8 +112,10 @@ class WaypointMessage:
         self.current_position = Odometry()
         """Target position is the designated waypoint"""
         self.target_position = PoseStamped()
+        self.target_position.pose.orientation.w = 1.0
         """Goal position is modified waypoint from ego-planner"""
         self.goal_position = Pose()
+        self.goal_position.orientation.w = 1.0
         self.is_moving = False
         self.waypoints = []
         self.send_seq = 0
@@ -130,13 +142,30 @@ class WaypointMessage:
         if len(self.waypoints) < 1:
             return False
 
-        # target_point = self.target_position.pose.position
-        target_point = self.goal_position.position
-        current_point = self.current_position.pose.pose.position
+        # goal_point = self.target_position.pose
+        goal_point = self.goal_position
+        current_point = self.current_position.pose.pose
 
-        distance = compute_distance(target_point, current_point)
+        distance = compute_distance(goal_point.position, current_point.position)
 
-        if distance < self.distance_tolerance:
+        rpy_goal = quaternion_to_euler(goal_point.orientation.x,
+                                       goal_point.orientation.y,
+                                       goal_point.orientation.w,
+                                       goal_point.orientation.z)
+        rpy_current = quaternion_to_euler(current_point.orientation.x,
+                                          current_point.orientation.y,
+                                          current_point.orientation.w,
+                                          current_point.orientation.z)
+        yaw_diff = min((2 * math.pi) - abs(rpy_goal[2]-rpy_current[2]), abs(rpy_goal[2]-rpy_current[2]))
+        yaw_diff = math.degrees(yaw_diff)
+
+        # Debug logging
+        if False:
+            rospy.loginfo(f"[Distance to the goal] {distance:.3f}m, [Angle difference]: {yaw_diff:.3f} degree")
+            rospy.loginfo(f"[   GOAL POSE] x: {goal_point.position.x:8.3f}, y: {goal_point.position.y:8.3f}, z: {goal_point.position.z:8.3f}, R: {rpy_goal[0]:8.3f}, P: {rpy_goal[1]:8.3f}, Y: {rpy_goal[2]:8.3f}")
+            rospy.loginfo(f"[CURRENT POSE] x: {current_point.position.x:8.3f}, y: {current_point.position.y:8.3f}, z: {current_point.position.z:8.3f}, R: {rpy_current[0]:8.3f}, P: {rpy_current[1]:8.3f}, Y: {rpy_current[2]:8.3f}")
+
+        if distance < self.distance_tolerance and yaw_diff < (self.distance_tolerance * 10):
             return True
 
         return False
@@ -181,10 +210,14 @@ class WaypointMessage:
         msg.header.frame_id = "map"
         msg.poses.append(pose)
         self.target_position = pose
-        self.goal_position = pose.pose
+        self.goal_position.position = pose.pose.position
+        self.goal_position.orientation = pose.pose.orientation
 
-        print(f"[CURRENT  WAYPOINT]: \n{pose.pose.position}")
-        print(f"[   ORIENTATION   ]: \n{pose.pose.orientation}")
+        # Debugging log
+        if False:
+            rospy.loginfo(f"[CURRENT  WAYPOINT]: \n{pose.pose.position}")
+            rospy.loginfo(f"[   ORIENTATION   ]: \n{pose.pose.orientation}")
+
         self.waypoint_pub.publish(msg)
         self.is_moving = True
 
@@ -199,9 +232,9 @@ class WaypointMessage:
         if msg.id != 1:
             return
 
-        # if compute_distance(msg.pose.position, self.target_position.pose.position) < (self.distance_tolerance * 2):
+        if compute_distance(msg.pose.position, self.target_position.pose.position) < (self.distance_tolerance * 2):
             # self.target_position.pose.position = msg.pose.position
-        self.goal_position.position = msg.pose.position
+            self.goal_position.position = msg.pose.position
 
 
 class MAVROSCommander:

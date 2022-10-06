@@ -52,7 +52,9 @@ class RCHandler:
                 'waypoint_1': [[0.0, 0.0, 1.2]],
             }
 
-        print(f"[TARGET WAYPOINT]: {self.target_waypoint}")
+        # Debugging log
+        if False:
+            rospy.loginfo(f"[TARGET WAYPOINT]: {self.target_waypoint}")
 
     def _start_waypoint(self) -> None:
         if self.is_waypoint_working:

@@ -15,6 +15,53 @@ def compute_distance(x: Pose, y: Pose) -> float:
     return math.sqrt(math.pow(x.x - y.x, 2) + math.pow(x.y - y.y, 2) + math.pow(x.z - y.z, 2))
 
 
+def get_quaternion_from_euler(roll: float, pitch: float, yaw: float) -> Tuple[float, float, float, float]:
+    """Convert an Euler angle to a quaternion.
+
+    Args:
+        roll: The roll (rotation around x-axis) angle in radians.
+        pitch: The pitch (rotation around y-axis) angle in radians.
+        yaw: The yaw (rotation around z-axis) angle in radians.
+
+    Return:
+        qx, qy, qz, qw: The orientation in quaternion [x,y,z,w] format
+    """
+    qx = math.sin(roll/2) * math.cos(pitch/2) * math.cos(yaw/2) - math.cos(roll/2) * math.sin(pitch/2) * math.sin(yaw/2)
+    qy = math.cos(roll/2) * math.sin(pitch/2) * math.cos(yaw/2) + math.sin(roll/2) * math.cos(pitch/2) * math.sin(yaw/2)
+    qz = math.cos(roll/2) * math.cos(pitch/2) * math.sin(yaw/2) - math.sin(roll/2) * math.sin(pitch/2) * math.cos(yaw/2)
+    qw = math.cos(roll/2) * math.cos(pitch/2) * math.cos(yaw/2) + math.sin(roll/2) * math.sin(pitch/2) * math.sin(yaw/2)
+
+    return (qx, qy, qz, qw)
+
+
+def quaternion_to_euler(x: float, y: float, z: float, w: float) -> Tuple[float, float, float]:
+    """Convert a quaternion to Euler angle.
+
+    Args:
+        x: quaternion x
+        y: quaternion y
+        z: quaternion z
+        w: quaternion w
+
+    Return:
+        roll, pitch, yaw in radians.
+    """
+    t0 = +2.0 * (w * x + y * z)
+    t1 = +1.0 - 2.0 * (x * x + y * y)
+    roll = math.atan2(t0, t1)
+
+    t2 = +2.0 * (w * y - z * x)
+    t2 = +1.0 if t2 > +1.0 else t2
+    t2 = -1.0 if t2 < -1.0 else t2
+    pitch = math.asin(t2)
+
+    t3 = +2.0 * (w * z + x * y)
+    t4 = +1.0 - 2.0 * (y * y + z * z)
+    yaw = math.atan2(t3, t4)
+
+    return (roll, pitch, yaw)
+
+
 class ControlMessage:
     """Send control message via MavROS"""
 
@@ -66,9 +113,15 @@ class WaypointMessage:
     def add_waypoint(self, x: float, y: float, z: float) -> None:
         self.waypoints.append((x, y, z))
 
+    def add_waypoint_yaw(self, x: float, y: float, z: float, yaw: float) -> None:
+        self.waypoints.append((x, y, z, yaw))
+
     def add_waypoints(self, points: List[Tuple[float, float, float]]) -> None:
         for point in points:
-            self.add_waypoint(*point)
+            if len(point) > 3:
+                self.add_waypoint_yaw(*point)
+            else:
+                self.add_waypoint(*point)
 
     def _check_current_location(self) -> bool:
         if len(self.waypoints) < 1:
@@ -106,7 +159,14 @@ class WaypointMessage:
             pose.pose.position.x = target_point[0]
             pose.pose.position.y = target_point[1]
             pose.pose.position.z = target_point[2]
-            pose.pose.orientation.w = 1.0
+            pose.pose.orientation = self.current_position.pose.pose.orientation
+
+            if len(target_point) > 3:
+                quaternion = get_quaternion_from_euler(0, 0, math.radians(-target_point[3]+90))
+                pose.pose.orientation.x = quaternion[0]
+                pose.pose.orientation.y = quaternion[1]
+                pose.pose.orientation.z = quaternion[2]
+                pose.pose.orientation.w = quaternion[3]
         else:
             pose = target_point
 
@@ -130,9 +190,8 @@ class WaypointMessage:
         if msg.id != 1:
             return
 
-        position = msg.pose.position
         if compute_distance(msg.pose.position, self.target_position.pose.position) < self.distance_tolerance:
-            self.target_position.pose = msg.pose
+            self.target_position.pose.position = msg.pose.position
 
 
 class MAVROSCommander:

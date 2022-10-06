@@ -98,6 +98,7 @@ class WaypointMessage:
     def __init__(
         self,
         distance_tolerance: float = 0.5,
+        angle_tolerance: float = 10.0,
         check_yaw: bool = True,
     ) -> None:
         self.waypoint_pub = rospy.Publisher('/waypoint_generator/waypoints',
@@ -113,6 +114,7 @@ class WaypointMessage:
                                                 self._loop_send_waypoint)
         self.distance_tolerance = distance_tolerance
         self.check_yaw = check_yaw
+        self.angle_tolerance = angle_tolerance
 
         self.current_position = Odometry()
         """Target position is the designated waypoint"""
@@ -171,7 +173,7 @@ class WaypointMessage:
             rospy.loginfo(f"[CURRENT POSE] x: {current_point.position.x:8.3f}, y: {current_point.position.y:8.3f}, z: {current_point.position.z:8.3f}, R: {rpy_current[0]:8.3f}, P: {rpy_current[1]:8.3f}, Y: {rpy_current[2]:8.3f}")
 
         if self.check_yaw:
-            if distance < self.distance_tolerance and yaw_diff < (self.distance_tolerance * 10):
+            if distance < self.distance_tolerance and yaw_diff < self.angle_tolerance:
                 return True
         else:
             if distance < self.distance_tolerance:
@@ -201,7 +203,16 @@ class WaypointMessage:
             pose.pose.position.x = target_point[0]
             pose.pose.position.y = target_point[1]
             pose.pose.position.z = target_point[2]
-            pose.pose.orientation = self.current_position.pose.pose.orientation
+            if self.current_position.pose.pose.orientation.x == 0 and \
+               self.current_position.pose.pose.orientation.y == 0 and \
+               self.current_position.pose.pose.orientation.z == 0 and \
+               self.current_position.pose.pose.orientation.w == 0:
+                pose.pose.orientation.w = 1.0
+            else:
+                pose.pose.orientation.x = self.current_position.pose.pose.orientation.x
+                pose.pose.orientation.y = self.current_position.pose.pose.orientation.y
+                pose.pose.orientation.z = self.current_position.pose.pose.orientation.z
+                pose.pose.orientation.w = self.current_position.pose.pose.orientation.w
 
             if len(target_point) > 3:
                 quaternion = get_quaternion_from_euler(0, 0, math.radians(-target_point[3]+90))
@@ -234,8 +245,10 @@ class WaypointMessage:
         self.current_position = msg
 
         if self.target_position.pose.position.x == 0 and self.target_position.pose.position.y == 0 and self.target_position.pose.position.z == 0:
-            self.goal_position = msg.pose.pose
-            self.target_position.pose = msg.pose.pose
+            self.goal_position.position = msg.pose.pose.position
+            self.goal_position.orientation = msg.pose.pose.orientation
+            self.target_position.pose.position = msg.pose.pose.position
+            self.target_position.pose.orientation = msg.pose.pose.orientation
 
     def callback_goal_point(self, msg: Marker) -> None:
         if msg.id != 1:

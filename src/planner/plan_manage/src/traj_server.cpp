@@ -42,6 +42,7 @@ bool use_velocity_control_, enable_rotate_head_, use_waypoint_yaw_;
 double forward_length_;
 
 double max_vel_;
+double z_offset_;
 
 void bsplineCallback(ego_planner::BsplineConstPtr msg)
 {
@@ -188,15 +189,13 @@ void cmdCallback(const ros::TimerEvent &e)
 
   /* check receive traj_ before calculate target */
   if (receive_traj_) {
-    Eigen::Vector3d z_offset = Eigen::Vector3d(0, 0, 0);
+    Eigen::Vector3d z_offset = Eigen::Vector3d(0, 0, z_offset_);
     Eigen::Vector3d closestPoint = findClosestPoint(odom_pos_, traj_[0]);
     Eigen::Vector3d refTarget = findClosestPoint(closestPoint, traj_[0], forward_length_) + z_offset;
     Eigen::Vector3d refTarget_forward = findClosestPoint(closestPoint, traj_[0], forward_length_ * 2.5) + z_offset;
     Eigen::Vector3d sub_vector(refTarget.x() - odom_pos_.x(), refTarget.y() - odom_pos_.y(), refTarget.z() - odom_pos_.z());
     Eigen::Vector3d sub_vector_xy(refTarget.x() - odom_pos_.x(), refTarget.y() - odom_pos_.y(), 0);
-    
-      // std::cout << "use_waypoint_yaw_ : " << (use_waypoint_yaw_?"true":"false") << ", ";
-      // std::cout << "cur_waypoint_initialized_ : " << (cur_waypoint_initialized_?"true":"false") << std::endl;
+
     double ref_yaw = last_yaw_;
     if (enable_rotate_head_) {
       ref_yaw = atan2(refTarget_forward.y() - odom_pos_.y(), refTarget_forward.x() - odom_pos_.x());
@@ -259,7 +258,7 @@ void cmdCallback(const ros::TimerEvent &e)
     } else if (sub_vector.norm() < 0.1) {
       msg.type_mask |= msg.IGNORE_YAW;
       receive_traj_ = false;
-      last_odom_pos_ = odom_pos_;
+      last_odom_pos_ = refTarget;
     } else {
       msg.type_mask |= msg.IGNORE_YAW;
       last_odom_pos_ = odom_pos_;
@@ -358,6 +357,7 @@ int main(int argc, char **argv)
   nh.param("traj_server/enable_rotate_head", enable_rotate_head_, true);
   nh.param("traj_server/use_waypoint_yaw", use_waypoint_yaw_, false);
   nh.param("traj_server/max_vel", max_vel_, 1.0);
+  nh.param("traj_server/z_offset", z_offset_, 0.0);
 
   ros::Duration(1.0).sleep();
 

@@ -6,7 +6,7 @@
 
   <arg name="waypoint" default="$(find rc_demo)/res/waypoints.yaml" doc="Waypoint definition yaml file." />
   <arg name="target_waypoint" default="waypoint_outdoor" doc="Target waypoint name to use defined in yaml file." />
-  <arg name="arrive_tolerance" default="0.8" doc="Waypoint arrive tolerance distance in meter." />
+  <arg name="arrive_tolerance" default="0.5" doc="Waypoint arrive tolerance distance in meter." />
 
   <!-- topic of your odometry such as VIO or LIO -->
   <arg name="odom_topic" value="/Odometry" />
@@ -84,6 +84,7 @@
     <param name="traj_server/enable_rotate_head" value="false" type="bool"/>
     <param name="traj_server/use_waypoint_yaw" value="true" type="bool"/>
     <param name="traj_server/max_vel" value="0.5" type="double"/>
+    <param name="traj_server/z_offset" value="0.15" type="double"/>
   </node>
 
   <node pkg="waypoint_generator" name="waypoint_generator" type="waypoint_generator" output="screen">

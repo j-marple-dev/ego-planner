@@ -100,7 +100,10 @@ class WaypointMessage:
         self.distance_tolerance = distance_tolerance
 
         self.current_position = Odometry()
+        """Target position is the designated waypoint"""
         self.target_position = PoseStamped()
+        """Goal position is modified waypoint from ego-planner"""
+        self.goal_position = Pose()
         self.is_moving = False
         self.waypoints = []
         self.send_seq = 0
@@ -127,7 +130,8 @@ class WaypointMessage:
         if len(self.waypoints) < 1:
             return False
 
-        target_point = self.target_position.pose.position
+        # target_point = self.target_position.pose.position
+        target_point = self.goal_position.position
         current_point = self.current_position.pose.pose.position
 
         distance = compute_distance(target_point, current_point)
@@ -176,6 +180,7 @@ class WaypointMessage:
         msg.header.frame_id = "map"
         msg.poses.append(pose)
         self.target_position = pose
+        self.goal_position = pose.pose
 
         self.waypoint_pub.publish(msg)
         self.is_moving = True
@@ -184,14 +189,16 @@ class WaypointMessage:
         self.current_position = msg
 
         if self.target_position.pose.position.x == 0 and self.target_position.pose.position.y == 0 and self.target_position.pose.position.z == 0:
+            self.goal_position = msg.pose.pose
             self.target_position.pose = msg.pose.pose
 
     def callback_goal_point(self, msg: Marker) -> None:
         if msg.id != 1:
             return
 
-        if compute_distance(msg.pose.position, self.target_position.pose.position) < self.distance_tolerance:
-            self.target_position.pose.position = msg.pose.position
+        # if compute_distance(msg.pose.position, self.target_position.pose.position) < (self.distance_tolerance * 2):
+            # self.target_position.pose.position = msg.pose.position
+        self.goal_position.position = msg.pose.position
 
 
 class MAVROSCommander:

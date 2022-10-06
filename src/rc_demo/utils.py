@@ -121,6 +121,17 @@ class WaypointMessage:
         self.waypoints = []
         self.send_seq = 0
 
+        self.offset_x = 0.0
+        self.offset_y = 0.0
+        self.offset_z = 0.0
+        self.offset_Y = 0.0
+
+    def set_offset(self, x: float, y: float, z: float, Y: float) -> None:
+        self.offset_x = x
+        self.offset_y = y
+        self.offset_z = z
+        self.offset_Y = Y
+
     def clear_waypoint(self) -> None:
         self.waypoints.clear()
         self.target_position.pose = self.current_position.pose.pose
@@ -186,13 +197,18 @@ class WaypointMessage:
         if target_point == None:
             target_point = self.waypoints.pop(0)
 
+            # apply offset
+            temp_x = target_point[0] - self.offset_x
+            temp_y = target_point[1] - self.offset_y
+            temp_rad = self.offset_Y / 180.0 * math.pi
+
             pose = PoseStamped()
             pose.header.seq = self.send_seq
             pose.header.stamp = rospy.Time.now()
             pose.header.frame_id = "map"
-            pose.pose.position.x = target_point[0]
-            pose.pose.position.y = target_point[1]
-            pose.pose.position.z = target_point[2]
+            pose.pose.position.x = temp_x * math.cos(temp_rad) - temp_y * math.sin(temp_rad)
+            pose.pose.position.y = temp_x * math.sin(temp_rad) + temp_y * math.cos(temp_rad)
+            pose.pose.position.z = target_point[2] - self.offset_z
             if self.current_position.pose.pose.orientation.x == 0 and \
                self.current_position.pose.pose.orientation.y == 0 and \
                self.current_position.pose.pose.orientation.z == 0 and \
@@ -205,7 +221,7 @@ class WaypointMessage:
                 pose.pose.orientation.w = self.current_position.pose.pose.orientation.w
 
             if len(target_point) > 3:
-                quaternion = get_quaternion_from_euler(0, 0, math.radians(-target_point[3]+90))
+                quaternion = get_quaternion_from_euler(0, 0, math.radians(-(target_point[3] - self.offset_Y)+90))
                 pose.pose.orientation.x = quaternion[0]
                 pose.pose.orientation.y = quaternion[1]
                 pose.pose.orientation.z = quaternion[2]

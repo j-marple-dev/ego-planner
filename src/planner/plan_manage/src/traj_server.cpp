@@ -266,7 +266,6 @@ void cmdCallback(const ros::TimerEvent &e)
 
   } else {
     msg.type_mask |= msg.IGNORE_VX | msg.IGNORE_VY | msg.IGNORE_VZ;
-    last_yaw_ = odom_yaw_;
 
     Eigen::Vector3d waypoint_pose(control_.position.x, control_.position.y, 0);
 
@@ -284,6 +283,7 @@ void cmdCallback(const ros::TimerEvent &e)
     if (abs(waypoint_yaw) > 0.1) {
       msg.type_mask |= msg.IGNORE_YAW;
       msg.yaw_rate = waypoint_yaw;
+      last_yaw_ = odom_yaw_;
     } else {
       msg.type_mask |= msg.IGNORE_YAW_RATE;
       msg.yaw = last_yaw_;

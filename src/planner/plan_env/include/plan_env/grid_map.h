@@ -163,7 +163,7 @@ public:
 
   inline void resetSearchArea();
   inline void setSearchAreaH();
-  inline void setSearchAreaV(Eigen::Vector3d& end);
+  inline void setSearchAreaV(const Eigen::Vector3d& end);
 
   inline void boundIndex(Eigen::Vector3i& id);
   inline bool isUnknown(const Eigen::Vector3i& id);
@@ -380,7 +380,7 @@ inline void GridMap::setSearchAreaH() {
   md_.max_cut_.z() = min(md_.max_cut_.z(), pos_i.z() + 2);
 }
 
-inline void GridMap::setSearchAreaV(Eigen::Vector3d& end) {
+inline void GridMap::setSearchAreaV(const Eigen::Vector3d& end) {
   resetSearchArea();
 
   Eigen::Vector3i pos_i, end_i;

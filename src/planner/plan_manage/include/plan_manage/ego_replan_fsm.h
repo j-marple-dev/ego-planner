@@ -114,8 +114,8 @@ namespace ego_planner
     bool control_zero_reset_;
     bool is_need_replan_ = false;
     int reboundReplan_fail_count_ = 0;
-    Eigen::Vector3d checkEnableWaypoint(const Eigen::Vector3d &start, const Eigen::Vector3d &waypoint);
-    Eigen::Vector3d checkEnableStartpoint(const Eigen::Vector3d &start);
+    Eigen::Vector3d checkSafetyPoint(const Eigen::Vector3d &pt, int inf_step_H, int inf_step_V);
+    void checkEnablePath(const Eigen::Vector3d &start, const Eigen::Vector3d &end);
 
   public:
     EGOReplanFSM(/* args */)

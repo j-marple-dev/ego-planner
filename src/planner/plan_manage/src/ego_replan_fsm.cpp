@@ -243,7 +243,7 @@ namespace ego_planner
 
     cout << "Triggered!" << endl;
     trigger_ = true;
-    init_pt_ = checkEnableStartpoint(odom_pos_);
+    init_pt_ = checkSafetyPoint(odom_pos_, 2, 2);
 
     end_pt_ << msg.poses[0].pose.position.x, msg.poses[0].pose.position.y, msg.poses[0].pose.position.z;
     visualization_->displayGoalPoint(end_pt_, Eigen::Vector4d(0.25, 1.0, 0.25, 0.7), 0.3, 0);
@@ -259,8 +259,10 @@ namespace ego_planner
       return;
     }
 
-    end_pt_ << checkEnableWaypoint(init_pt_, end_pt_);
+    end_pt_ << checkSafetyPoint(end_pt_, 7, 3);
     visualization_->displayGoalPoint(end_pt_, Eigen::Vector4d(0.25, 0.25, 1.0, 0.7), 0.3, 1);
+
+    checkEnablePath(init_pt_, end_pt_);
 
     bool success = planner_manager_->planGlobalTraj(init_pt_, odom_vel_, Eigen::Vector3d::Zero(), end_pt_, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
 
@@ -602,35 +604,34 @@ namespace ego_planner
     // }
   }
 
-  Eigen::Vector3d EGOReplanFSM::checkEnableStartpoint(const Eigen::Vector3d &start) {
+  Eigen::Vector3d EGOReplanFSM::checkSafetyPoint(const Eigen::Vector3d &in_pt, int inf_step_H, int inf_step_V) {
     // first, check is waypoint validate
     auto map = planner_manager_->grid_map_;
-    auto inflatePointWithoutObs = [map](const Eigen::Vector3d& pt, int step, vector<Eigen::Vector3d>& pts) {
+    auto inflatePointWithoutObs = [map](const Eigen::Vector3d& in_pt, int step_H, int step_V, vector<Eigen::Vector3d>& pts) {
       pts.clear();
       double res = map->getResolution();
       /* ---------- all inflate ---------- */
-      for (int x = -step; x <= step; ++x)
-        for (int y = -step; y <= step; ++y)
-          for (int z = -step; z <= step; ++z) {
-            if (sqrt(x*x + y*y + z*z) > (double)step) continue;
-            Eigen::Vector3d new_pt(pt(0) + (double)x * res, pt(1) + (double)y * res, pt(2) + (double)z * res);
+      for (int x = -step_H; x <= step_H; ++x)
+        for (int y = -step_H; y <= step_H; ++y)
+          for (int z = -step_V; z <= step_V; ++z) {
+            if (sqrt(x*x + y*y + z*z) > (double)step_H) continue;
+            Eigen::Vector3d new_pt(in_pt(0) + (double)x * res, in_pt(1) + (double)y * res, in_pt(2) + (double)z * res);
             if (!map->getInflateOccupancy(new_pt)) {
               pts.push_back(new_pt);
             }
           }
     };
 
-    int inf_step = 2; // TODO: add inf_step parameter for this function
     vector<Eigen::Vector3d> inf_pts;
-    inflatePointWithoutObs(start, inf_step, inf_pts);
+    inflatePointWithoutObs(in_pt, inf_step_H, inf_step_V, inf_pts);
 
     if (inf_pts.size() > 0) {
       double best_score = inf_pts.size();
-      Eigen::Vector3d best_pt = start;
+      Eigen::Vector3d best_pt = in_pt;
 
       for (auto inf_pt : inf_pts) {
         vector<Eigen::Vector3d> inf_pts_sub;
-        inflatePointWithoutObs(inf_pt, inf_step, inf_pts_sub);
+        inflatePointWithoutObs(inf_pt, inf_step_H, inf_step_V, inf_pts_sub);
         double score = (double)inf_pts_sub.size();
         if (score > best_score) {
           best_pt = inf_pt;
@@ -641,56 +642,15 @@ namespace ego_planner
       return best_pt;
     }
     
-    return start;
+    return in_pt;
   }
 
-  Eigen::Vector3d EGOReplanFSM::checkEnableWaypoint(const Eigen::Vector3d &start, const Eigen::Vector3d &end) {
-    Eigen::Vector3d waypoint = end;
-
-ros::Time time_1 = ros::Time::now();
-    // first, check is waypoint validate
-    auto map = planner_manager_->grid_map_;
-    auto inflatePointWithoutObs = [map](const Eigen::Vector3d& pt, int step, vector<Eigen::Vector3d>& pts) {
-      pts.clear();
-      double res = map->getResolution();
-      /* ---------- all inflate ---------- */
-      for (int x = -step; x <= step; ++x)
-        for (int y = -step; y <= step; ++y)
-          for (int z = -step/2; z <= step/2; ++z) {
-            if (sqrt(x*x + y*y + z*z) > (double)step) continue;
-            Eigen::Vector3d new_pt(pt(0) + (double)x * res, pt(1) + (double)y * res, pt(2) + (double)z * res);
-            if (!map->getInflateOccupancy(new_pt)) {
-              pts.push_back(new_pt);
-            }
-          }
-    };
-
-    int inf_step = 7; // TODO: add inf_step parameter for this function
-    vector<Eigen::Vector3d> inf_pts;
-    inflatePointWithoutObs(waypoint, inf_step, inf_pts);
-
-    if (inf_pts.size() > 0) {
-      double best_score = inf_pts.size();
-      Eigen::Vector3d best_pt = waypoint;
-
-      for (auto inf_pt : inf_pts) {
-        vector<Eigen::Vector3d> inf_pts_sub;
-        inflatePointWithoutObs(inf_pt, inf_step, inf_pts_sub);
-        double score = (double)inf_pts_sub.size();
-        if (score > best_score) {
-          best_pt = inf_pt;
-          best_score = score;
-        }
-      }
-
-      waypoint = best_pt;
-    }
-
+  void EGOReplanFSM::checkEnablePath(const Eigen::Vector3d &start, const Eigen::Vector3d &end) {
     // TODO: check A* start path
-ros::Time time_2 = ros::Time::now();
+ros::Time time_1 = ros::Time::now();
     vector<vector<Eigen::Vector3d>> a_star_pathes;
     vector<Eigen::Vector3d> a_star_path_H, a_star_path_V, a_star_path_A;
-    double expected_length = (waypoint - start).norm() / planner_manager_->grid_map_->getResolution();
+    double expected_length = (end - start).norm() / planner_manager_->grid_map_->getResolution();
 
     auto shrink_path = [&](vector<Eigen::Vector3d> a_star_path){
       if (a_star_path.size() < 2) return a_star_path;
@@ -723,14 +683,14 @@ ros::Time time_2 = ros::Time::now();
     
     if (expected_length > 1) {
       planner_manager_->grid_map_->setSearchAreaH();
-      if (planner_manager_->bspline_optimizer_rebound_->a_star_->AstarSearch(0.1, start, waypoint)) {
+      if (planner_manager_->bspline_optimizer_rebound_->a_star_->AstarSearch(0.1, start, end)) {
         a_star_path_H = planner_manager_->bspline_optimizer_rebound_->a_star_->getPath();
       }
     }
 
     if (a_star_path_H.size() > expected_length * 1.1 || a_star_path_H.size() == 0) {
-      planner_manager_->grid_map_->setSearchAreaV(waypoint);
-      if (planner_manager_->bspline_optimizer_rebound_->a_star_->AstarSearch(0.1, start, waypoint)) {
+      planner_manager_->grid_map_->setSearchAreaV(end);
+      if (planner_manager_->bspline_optimizer_rebound_->a_star_->AstarSearch(0.1, start, end)) {
         a_star_path_V = planner_manager_->bspline_optimizer_rebound_->a_star_->getPath();
       }
     }
@@ -738,7 +698,7 @@ ros::Time time_2 = ros::Time::now();
     if (a_star_path_V.size() > expected_length * 1.1 || (a_star_path_V.size() == 0 && a_star_path_H.size() > expected_length * 1.1) || a_star_path_H.size() == 0)
     {
       planner_manager_->grid_map_->resetSearchArea();
-      if (planner_manager_->bspline_optimizer_rebound_->a_star_->AstarSearch(0.1, start, waypoint)) {
+      if (planner_manager_->bspline_optimizer_rebound_->a_star_->AstarSearch(0.1, start, end)) {
         a_star_path_A = planner_manager_->bspline_optimizer_rebound_->a_star_->getPath();
       }
     }
@@ -750,77 +710,14 @@ ros::Time time_2 = ros::Time::now();
     planner_manager_->visualization_->displayAStarList(a_star_pathes, 0);
     planner_manager_->grid_map_->resetSearchArea();
 
-ros::Time time_3 = ros::Time::now();
+ros::Time time_2 = ros::Time::now();
 // compute time check
-std::cout << "move goal time : " << (time_2 - time_1).toSec() << std::endl;
-std::cout << "AstarSearch time : " << (time_3 - time_2).toSec() << std::endl;
+std::cout << "AstarSearch time : " << (time_2 - time_1).toSec() << std::endl;
 std::cout << "expected : " << expected_length << ", ";
 std::cout << "H : " << a_star_path_H.size() << ", ";
 std::cout << "V : " << a_star_path_V.size() << ", ";
 std::cout << "A : " << a_star_path_A.size() << std::endl;
-    return waypoint;
-
-    // // find obstacle in corner
-    // if (a_star_pathes.size() > 0 && a_star_pathes.front().size() > 2) {
-    //   auto a_star_path = a_star_pathes.front();
-    //   vector<Eigen::Vector3i> path_dirs;
-
-    //   for (size_t i = 1; i < a_star_path.size(); i++) {
-    //     Eigen::Vector3i ipos_1, ipos_2;
-    //     planner_manager_->grid_map_->posToIndex(a_star_path[i-1], ipos_1);
-    //     planner_manager_->grid_map_->posToIndex(a_star_path[i], ipos_2);
-    //     path_dirs.push_back(ipos_2 - ipos_1);
-    //   }
-
-    //   bool is_left = false;
-    //   bool is_right = false;
-    //   auto map = planner_manager_->grid_map_;
-
-    //   for (size_t i = 1; i < path_dirs.size(); i++) {
-    //     if (path_dirs[i].x() == 0 && path_dirs[i].y() == 0) continue;
-    //     Eigen::Vector3d path_pos = a_star_path[i];
-    //     if ((path_pos - odom_pos_).norm() < 1.0) continue;
-
-    //     double ang1 = atan2(path_dirs[i-1].y(), path_dirs[i-1].x());
-    //     double ang2 = atan2(path_dirs[i].y(), path_dirs[i].x());
-    //     double angle12 = ang2 - ang1;
-    //     if (angle12 > M_PI) angle12 -= M_PI;
-    //     if (angle12 < -M_PI) angle12 += M_PI;
-    //     if (angle12 > 0) {
-    //       is_left = true;
-    //       is_right = false;
-    //     } else if (angle12 < 0) {
-    //       is_left = false;
-    //       is_right = true;
-    //     }
-
-    //     if (is_left || is_right) {
-    //       Eigen::Vector3d offset(0, 0, 0);
-    //       if (is_left) {
-    //         offset.x() = -((double)path_dirs[i].y());
-    //         offset.y() = ((double)path_dirs[i].x());
-    //       } else if (is_right) {
-    //         offset.x() = ((double)path_dirs[i].y());
-    //         offset.y() = -((double)path_dirs[i].x());
-    //       }
-    //       offset = offset.normalized() * map->getResolution();
-
-    //       if (map->getInflateOccupancy(path_pos + offset)) {
-    //         int free_cell_count = 1;
-    //         int count_max = 12;
-    //         for (int count = 0; count <= count_max; count++) {
-    //           if (map->getInflateOccupancy(path_pos - ((double)free_cell_count) * offset))
-    //             break;
-    //           else
-    //             free_cell_count ++;
-    //         }
-    //         return path_pos - ((double)(free_cell_count / 2)) * offset;
-    //       }
-    //     }
-    //   }
-    // }
-
-    // return waypoint;
+    return;
   }
 
   bool EGOReplanFSM::callReboundReplan(bool flag_use_poly_init, bool flag_randomPolyTraj)

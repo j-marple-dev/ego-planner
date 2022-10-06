@@ -15,6 +15,8 @@ ros::Publisher setpoint_raw_pub;
 Eigen::Vector3d odom_pos_, odom_vel_; // odometry state
 double odom_yaw_ = 0;
 geometry_msgs::Pose control_;
+geometry_msgs::Pose cur_waypoint_;
+bool cur_waypoint_initialized_ = false;
 
 ros::Publisher pos_cmd_pub, ref_target_pub;
 
@@ -36,7 +38,7 @@ int traj_id_;
 // yaw control
 double last_yaw_, last_yaw_dot_;
 double time_forward_;
-bool use_velocity_control_, enable_rotate_head_;
+bool use_velocity_control_, enable_rotate_head_, use_waypoint_yaw_;
 double forward_length_;
 
 double max_vel_;
@@ -193,9 +195,20 @@ void cmdCallback(const ros::TimerEvent &e)
     Eigen::Vector3d sub_vector(refTarget.x() - odom_pos_.x(), refTarget.y() - odom_pos_.y(), refTarget.z() - odom_pos_.z());
     Eigen::Vector3d sub_vector_xy(refTarget.x() - odom_pos_.x(), refTarget.y() - odom_pos_.y(), 0);
     
+      // std::cout << "use_waypoint_yaw_ : " << (use_waypoint_yaw_?"true":"false") << ", ";
+      // std::cout << "cur_waypoint_initialized_ : " << (cur_waypoint_initialized_?"true":"false") << std::endl;
     double ref_yaw = last_yaw_;
     if (enable_rotate_head_) {
       ref_yaw = atan2(refTarget_forward.y() - odom_pos_.y(), refTarget_forward.x() - odom_pos_.x());
+      last_yaw_ = ref_yaw;
+    } else if (use_waypoint_yaw_ && cur_waypoint_initialized_) {
+      Eigen::Quaterniond waypoint_orient;
+      waypoint_orient.x() = cur_waypoint_.orientation.x;
+      waypoint_orient.y() = cur_waypoint_.orientation.y;
+      waypoint_orient.z() = cur_waypoint_.orientation.z;
+      waypoint_orient.w() = cur_waypoint_.orientation.w;
+      Eigen::Vector3d rot_x = waypoint_orient.toRotationMatrix().block(0, 0, 3, 1);
+      ref_yaw = atan2(rot_x(1), rot_x(0));
       last_yaw_ = ref_yaw;
     }
 
@@ -304,6 +317,11 @@ void controlCallback(const geometry_msgs::PoseConstPtr &msg) {
   control_ = *msg;
 }
 
+void waypointCallback(const nav_msgs::PathConstPtr &msg) {
+  cur_waypoint_ = msg->poses[0].pose;
+  cur_waypoint_initialized_ = true;
+}
+
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "traj_server");
@@ -313,7 +331,8 @@ int main(int argc, char **argv)
   // ros::Subscriber bspline_sub = node.subscribe("planning/bspline", 10, bsplineCallback);
   ros::Subscriber trajlist_sub = node.subscribe("/ego_planner_node/traj_list", 10, customTrajCallback);
   ros::Subscriber odom_sub = node.subscribe("/odom_world", 10, odom_callback);
-  ros::Subscriber waypoint_sub = node.subscribe("/waypoint_generator/waypoint_manual", 10, controlCallback);
+  ros::Subscriber control_sub = node.subscribe("/waypoint_generator/waypoint_manual", 10, controlCallback);
+  ros::Subscriber waypoint_sub = node.subscribe("/waypoint_generator/waypoints", 10, waypointCallback);
 
   pos_cmd_pub = node.advertise<quadrotor_msgs::PositionCommand>("/position_cmd", 50);
   setpoint_raw_pub = node.advertise<mavros_msgs::PositionTarget>("/mavros/setpoint_raw/local", 1);
@@ -337,6 +356,7 @@ int main(int argc, char **argv)
   nh.param("traj_server/use_velocity_control", use_velocity_control_, false);
   nh.param("traj_server/forward_length", forward_length_, 1.0);
   nh.param("traj_server/enable_rotate_head", enable_rotate_head_, true);
+  nh.param("traj_server/use_waypoint_yaw", use_waypoint_yaw_, false);
   nh.param("traj_server/max_vel", max_vel_, 1.0);
 
   ros::Duration(1.0).sleep();

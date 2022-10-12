@@ -252,7 +252,7 @@ void cmdCallback(const ros::TimerEvent &e)
       msg.velocity.z = refVel.z();
     }
 
-    if (sub_vector_xy.norm() > 0.5) {
+    if (sub_vector_xy.norm() > forward_length_ * 0.6) {
       msg.type_mask |= msg.IGNORE_YAW_RATE;
       msg.yaw = ref_yaw;
     } else if (sub_vector.norm() < 0.1) {

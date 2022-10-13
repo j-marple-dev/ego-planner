@@ -132,6 +132,8 @@ class WaypointMessage:
         self.offset_z = 0.0
         self.offset_Y = 0.0
 
+        self.commander = MAVROSCommander()
+
     def set_offset(self, x: float, y: float, z: float, Y: float) -> None:
         self.offset_x = x
         self.offset_y = y
@@ -201,6 +203,10 @@ class WaypointMessage:
 
         if len(self.waypoints) < 1:
             target_point = self.target_position
+
+            if target_point.pose.position.z == -1:
+                """change to land"""
+                self.commander.set_mode("AUTO.LAND")
 
         self.send_seq += 1
 

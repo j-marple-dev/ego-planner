@@ -13,7 +13,9 @@ waypoint_0:
 
 waypoint_1:
   [
-    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 1.0],
+    [0.0, 0.0, 1.0, 180],
+    [0.0, 0.0, -1.0],
   ]
 
 waypoint_outdoor:
@@ -100,15 +102,15 @@ waypoint_merged:
     [28, 5.0, 1.5],
     [28.9, 8.5, 1],  # Right of stair
     [26.7, 9.4, 1],   # In front of stair
-    # [26.7, 15.2, 3.4],  # Middle of stair left  y: 1.47
-    # [28.7, 15.2, 3.7],  # Middle of stair right
-    # [28, 5.7, 5.4],  # 2nd floor
-    # [5.7, 28.8, 5.2, 90],  # In front of first door
-    # [28, 5.7, 5.4],  # 2nd floor
+    [26.7, 15.2, 3.4],  # Middle of stair left  y: 1.47
+    [28.7, 15.2, 3.7],  # Middle of stair right
+    [28, 5.7, 5.4],  # 2nd floor
+    [5.7, 28.8, 5.2, 90],  # In front of first door
+    [28, 5.7, 5.4],  # 2nd floor
     # Return to base
-    # [28.7, 15.2, 3.7],  # Middle of stair right
-    # [26.7, 15.2, 3.4],  # Middle of stair left  y: 1.47
-    # [26.7, 9.4, 1],   # In front of stair
+    [28.7, 15.2, 3.7],  # Middle of stair right
+    [26.7, 15.2, 3.4],  # Middle of stair left  y: 1.47
+    [26.7, 9.4, 1],   # In front of stair
     [28.9, 8.5, 1],  # Right of stair
     [28, 5.0, 1.5],
     [28, 1.00, 1.5, 270],

@@ -218,6 +218,10 @@ class WaypointMessage:
             temp_y = target_point[1] - self.offset_y
             temp_rad = self.offset_Y / 180.0 * math.pi
 
+            # Ignore offset if waypoint is (0, 0)
+            if target_point[0] == 0 and target_point[1] == 0:
+                temp_x = temp_y = 0
+
             pose = PoseStamped()
             pose.header.seq = self.send_seq
             pose.header.stamp = rospy.Time.now()

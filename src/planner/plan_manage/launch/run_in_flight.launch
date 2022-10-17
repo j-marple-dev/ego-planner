@@ -8,6 +8,10 @@
   <arg name="target_waypoint" default="waypoint_outdoor" doc="Target waypoint name to use defined in yaml file." />
   <arg name="distance_tolerance" default="0.5" doc="Waypoint distance tolerance distance in meter." />
   <arg name="angle_tolerance" default="10.0" doc="Waypoint angle tolerance degrees." />
+  <arg name="offset_x" default="0.0" doc="Offset x of the initial position" />
+  <arg name="offset_y" default="0.0" doc="Offset y of the initial position" />
+  <arg name="offset_z" default="0.0" doc="Offset z of the initial position" />
+  <arg name="offset_Y" default="0.0" doc="Offset yaw of the initial position" />
 
   <!-- topic of your odometry such as VIO or LIO -->
   <arg name="odom_topic" value="/Odometry" />
@@ -102,6 +106,10 @@
     <arg name="waypoint" value="$(arg waypoint)" />
     <arg name="target_waypoint" value="$(arg target_waypoint)" />
     <arg name="distance_tolerance" value="$(arg distance_tolerance)" />
+    <arg name="offset_x" value="$(arg offset_x)" />
+    <arg name="offset_y" value="$(arg offset_y)" />
+    <arg name="offset_z" value="$(arg offset_z)" />
+    <arg name="offset_Y" value="$(arg offset_Y)" />
   </include>
 
   <!-- use simulator -->
@@ -115,7 +123,6 @@
 
     <arg name="odometry_topic" value="$(arg odom_topic)" />
   </include> -->
-<!--
-  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find ego_planner)/launch/default.rviz" required="true" />
--->
+
+  <!-- node name="rviz" pkg="rviz" type="rviz" args="-d $(find ego_planner)/launch/default.rviz" required="true" /-->
 </launch>

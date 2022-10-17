@@ -2,17 +2,41 @@
 
 import sys
 import rospy
+import yaml
+import time
+import threading
 
+from std_msgs.msg import String
 from mavros_msgs.msg import RCIn
 
-from utils import ControlMessage
+from utils import ControlMessage, WaypointMessage
+
+waypoint_thread_lock = threading.Lock()
 
 class RCHandler:
     """Receieve RC stick data."""
 
-    def __init__(self) -> None:
+    def __init__(self,
+                 use_rc_control: bool = True,
+                 waypoint_path: str = "",
+                 target_waypoint: str = "waypoint_0",
+                 distance_tolerance: float = 0.5,
+                 angle_tolerance: float = 10.0,
+                 offset_x: float = 0.0,
+                 offset_y: float = 0.0,
+                 offset_z: float = 0.0,
+                 offset_Y: float = 0.0,
+                 check_yaw: bool = True) -> None:
+        self.use_rc_control = use_rc_control
+        self.target_waypoint = target_waypoint
+
         self.rc_sub = rospy.Subscriber("/mavros/rc/in", RCIn, self.callback_rc_in)
+        self.waypoint_trigger_sub = rospy.Subscriber("/custom/waypoint_trigger", String, self.callback_waypoint_trigger)
         self.control_msg = ControlMessage()
+        self.waypoint_msg = WaypointMessage(distance_tolerance, angle_tolerance, check_yaw)
+        self.waypoint_msg.set_offset(offset_x, offset_y, offset_z, offset_Y)
+
+        self.is_waypoint_working = False
 
         self.is_calibrated = False
         self.calib_count = 0
@@ -26,12 +50,63 @@ class RCHandler:
 
         self.cmd_magnitude = 1.0
 
+        if waypoint_path != "":
+            with open(waypoint_path, 'r') as f:
+                self.waypoints = yaml.load(f, yaml.SafeLoader)
+        else:
+            self.waypoints = {
+                'waypoint_0': [[0.0, 0.0, 1.2]],
+                'waypoint_1': [[0.0, 0.0, 1.2]],
+            }
+
+        # Debugging log
+        if False:
+            rospy.loginfo(f"[TARGET WAYPOINT]: {self.target_waypoint}")
+
+    def _start_waypoint(self) -> None:
+        if self.is_waypoint_working:
+            return
+
+        waypoint_thread_lock.acquire()
+
+        self.is_waypoint_working = True
+        self.waypoint_msg.clear_waypoint()
+        self.waypoint_msg.add_waypoints(self.waypoints[self.target_waypoint])
+
+        waypoint_thread_lock.release()
+
+    def _terminate_waypoint(self) -> None:
+        waypoint_thread_lock.acquire()
+
+        self.is_waypoint_working = False
+        self.waypoint_msg.clear_waypoint()
+
+        waypoint_thread_lock.release()
+
+    def callback_waypoint_trigger(self, msg: String) -> None:
+        """Test trigger callback for waypoint flight.
+
+        You will need to trigger this by following command.
+        rostopic pub /custom/waypoint_trigger std_msgs/String "data: 'on'"
+        rostopic pub /custom/waypoint_trigger std_msgs/String "data: 'off'"
+        """
+        if msg.data == "on":
+            self._start_waypoint()
+        elif msg.data == "off":
+            self._terminate_waypoint()
 
     def callback_rc_in(self, msg: RCIn) -> None:
         """Receieves /mavros/rc/in
 
         Receieved stick message will be sent
         """
+
+        # Check waypoint switch
+        if 1300 < msg.channels[6] < 1700:
+            self._start_waypoint()
+        elif 1000 < msg.channels[6] < 1300:
+            self._terminate_waypoint()
+
         for i in range(4):
             self.val_range[0] = min(self.val_range[0], msg.channels[i])
             self.val_range[1] = max(self.val_range[1], msg.channels[i])
@@ -64,7 +139,7 @@ class RCHandler:
         else:
             self.calib_count = 0
 
-        if not self.is_calibrated:
+        if not self.is_calibrated or not self.use_rc_control:
             return
 
         self.control_msg.send_control(-self.roll * self.cmd_magnitude,
@@ -77,7 +152,22 @@ if __name__ == "__main__":
     args = rospy.myargv(argv=sys.argv)
     rospy.init_node("flight_control_node", anonymous=True)
 
-    rc_handler = RCHandler()
+    use_rc_control = rospy.get_param('~rc_control', False)
+    waypoint_path = rospy.get_param('~waypoint', "")
+    target_waypoint = rospy.get_param('~target_waypoint', "waypoint_0")
+    distance_tolerance = rospy.get_param('~distance_tolerance', 0.5)
+    angle_tolerance = rospy.get_param('~angle_tolerance', 10)
+
+    offset_x = rospy.get_param('~offset_x', 0)
+    offset_y = rospy.get_param('~offset_y', 0)
+    offset_z = rospy.get_param('~offset_z', 0)
+    offset_Y = rospy.get_param('~offset_Y', 0)
+
+    check_yaw = rospy.get_param("~check_yaw", True)
+    distance_tolerance = rospy.get_param('~distance_tolerance', 0.5)
+    angle_tolerance = rospy.get_param('~angle_tolerance', 10)
+
+    rc_handler = RCHandler(use_rc_control, waypoint_path, target_waypoint, distance_tolerance, angle_tolerance, offset_x, offset_y, offset_z, offset_Y, check_yaw)
 
     rospy.spin()
 

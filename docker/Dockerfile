@@ -62,6 +62,9 @@ RUN wget http://ceres-solver.org/ceres-solver-2.1.0.tar.gz \
     && mkdir ceres-bin && cd ceres-bin \
     && cmake ../ceres-solver-2.1.0 && make -j3 && sudo make install
 
+# Install rospkg for rc_flight
+RUN pip3 install rospkg
+
 # Build livox_ros_driver
 RUN echo "source /opt/ros/melodic/setup.sh" >> /home/user/.bashrc
 WORKDIR /home/user

@@ -2,7 +2,7 @@
   <!-- size of map, change the size inflate x, y, z according to your application -->
   <arg name="map_size_x" value="100.0"/>
   <arg name="map_size_y" value="100.0"/>
-  <arg name="map_size_z" value=" 4.5"/>
+  <arg name="map_size_z" value=" 12.0"/>
 
   <!-- topic of your odometry such as VIO or LIO -->
   <arg name="odom_topic" value="/Odometry" />
@@ -78,6 +78,9 @@
     <param name="traj_server/time_forward" value="1.0" type="double"/>
     <param name="traj_server/use_velocity_control" value="true" type="bool"/>
     <param name="traj_server/enable_rotate_head" value="false" type="bool"/>
+    <param name="traj_server/use_waypoint_yaw" value="true" type="bool"/>
+    <param name="traj_server/max_vel" value="0.5" type="double"/>
+    <param name="traj_server/z_offset" value="0.15" type="double"/>
   </node>
 
   <node pkg="waypoint_generator" name="waypoint_generator" type="waypoint_generator" output="screen">

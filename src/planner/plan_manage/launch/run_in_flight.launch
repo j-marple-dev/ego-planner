@@ -2,7 +2,16 @@
   <!-- size of map, change the size inflate x, y, z according to your application -->
   <arg name="map_size_x" value="150.0"/>
   <arg name="map_size_y" value="150.0"/>
-  <arg name="map_size_z" value=" 10.0"/>
+  <arg name="map_size_z" value=" 15.0"/>
+
+  <arg name="waypoint" default="$(find rc_demo)/res/waypoints.yaml" doc="Waypoint definition yaml file." />
+  <arg name="target_waypoint" default="waypoint_outdoor" doc="Target waypoint name to use defined in yaml file." />
+  <arg name="distance_tolerance" default="0.5" doc="Waypoint distance tolerance distance in meter." />
+  <arg name="angle_tolerance" default="10.0" doc="Waypoint angle tolerance degrees." />
+  <arg name="offset_x" default="0.0" doc="Offset x of the initial position" />
+  <arg name="offset_y" default="0.0" doc="Offset y of the initial position" />
+  <arg name="offset_z" default="0.0" doc="Offset z of the initial position" />
+  <arg name="offset_Y" default="0.0" doc="Offset yaw of the initial position" />
 
   <!-- topic of your odometry such as VIO or LIO -->
   <arg name="odom_topic" value="/Odometry" />
@@ -32,11 +41,11 @@
     <arg name="fy" value="387.229248046875"/>
 
     <!-- maximum velocity and acceleration the drone will reach -->
-    <arg name="max_vel" value="2.0" />
-    <arg name="max_acc" value="3.0" />
+    <arg name="max_vel" value="0.5" />
+    <arg name="max_acc" value="1.5" />
 
     <!--always set to 1.5 times grater than sensing horizen-->
-    <arg name="planning_horizon" value="7.5" /> 
+    <arg name="planning_horizon" value="14.5" /> 
 
     <!-- 1: use 2D Nav Goal to select goal  -->
     <!-- 2: use global waypoints below  -->
@@ -66,7 +75,7 @@
     <arg name="point4_y" value="0.0" />
     <arg name="point4_z" value="1.0" />
     
-    <arg name="control_zero_reset" value="true" />
+    <arg name="control_zero_reset" value="false" />
 
   </include>
 
@@ -76,8 +85,12 @@
 
     <remap from="/odom_world" to="$(arg odom_topic)"/>
     <param name="traj_server/time_forward" value="1.0" type="double"/>
-    <param name="traj_server/use_velocity_control" value="false" type="bool"/>
-    <param name="traj_server/enable_rotate_head" value="true" type="bool"/>
+    <param name="traj_server/use_velocity_control" value="true" type="bool"/>
+    <param name="traj_server/enable_rotate_head" value="false" type="bool"/>
+    <param name="traj_server/use_waypoint_yaw" value="true" type="bool"/>
+    <param name="traj_server/max_vel" value="0.5" type="double"/>
+    <param name="traj_server/z_offset" value="0.15" type="double"/>
+    <param name="traj_server/forward_length" value="0.6" type="double"/>
   </node>
 
   <node pkg="waypoint_generator" name="waypoint_generator" type="waypoint_generator" output="screen">
@@ -88,8 +101,16 @@
     <param name="waypoint_type" value="manual-lonely-waypoint"/>    
   </node>
 
-  <node pkg="rc_demo" name="flight_control_node" type="rc_flight.py" output="screen">
-  </node>
+  <include file="$(find rc_demo)/launch/rc_flight.launch">
+    <arg name="rc_control" value="false" />
+    <arg name="waypoint" value="$(arg waypoint)" />
+    <arg name="target_waypoint" value="$(arg target_waypoint)" />
+    <arg name="distance_tolerance" value="$(arg distance_tolerance)" />
+    <arg name="offset_x" value="$(arg offset_x)" />
+    <arg name="offset_y" value="$(arg offset_y)" />
+    <arg name="offset_z" value="$(arg offset_z)" />
+    <arg name="offset_Y" value="$(arg offset_Y)" />
+  </include>
 
   <!-- use simulator -->
   <!-- <include file="$(find ego_planner)/launch/simulator.xml">
@@ -102,7 +123,6 @@
 
     <arg name="odometry_topic" value="$(arg odom_topic)" />
   </include> -->
-<!--
-  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find ego_planner)/launch/default.rviz" required="true" />
--->
+
+  <!-- node name="rviz" pkg="rviz" type="rviz" args="-d $(find ego_planner)/launch/default.rviz" required="true" /-->
 </launch>

@@ -143,6 +143,8 @@ public:
   void resetBuffer();
   void resetBuffer(Eigen::Vector3d min, Eigen::Vector3d max);
 
+  void change_origin(Eigen::Vector3d move_offset);
+
   inline void posToIndex(const Eigen::Vector3d& pos, Eigen::Vector3i& id);
   inline void indexToPos(const Eigen::Vector3i& id, Eigen::Vector3d& pos);
   inline int toAddress(const Eigen::Vector3i& id);

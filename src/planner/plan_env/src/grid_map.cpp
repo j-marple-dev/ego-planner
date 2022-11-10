@@ -50,7 +50,7 @@ void GridMap::initMap(ros::NodeHandle &nh)
   node_.param("grid_map/ground_height", mp_.ground_height_, 1.0);
 
   mp_.resolution_inv_ = 1 / mp_.resolution_;
-  mp_.map_origin_ = Eigen::Vector3d(-x_size / 2.0, -y_size / 2.0, mp_.ground_height_);
+  mp_.map_origin_ = Eigen::Vector3d(-x_size / 2.0, -y_size / 2.0, -z_size / 2.0);
   mp_.map_size_ = Eigen::Vector3d(x_size, y_size, z_size);
 
   mp_.prob_hit_log_ = logit(mp_.p_hit_);
@@ -174,6 +174,89 @@ void GridMap::resetBuffer(Eigen::Vector3d min_pos, Eigen::Vector3d max_pos)
       {
         md_.occupancy_buffer_inflate_[toAddress(x, y, z)] = 0;
       }
+}
+
+void GridMap::change_origin(Eigen::Vector3d move_offset)
+{
+  Eigen::Vector3i offset_id;
+  posToIndex(mp_.map_origin_ + move_offset, offset_id);
+  int offset = toAddress(offset_id);
+
+  // std::cout << "origin- " << mp_.map_origin_(0) << ", " << mp_.map_origin_(1) << ", " << mp_.map_origin_(2) << std::endl;
+  // std::cout << "offset- " << move_offset(0) << ", " << move_offset(1) << ", " << move_offset(2) << " : " << offset << std::endl;
+
+  if (offset > 0) {
+    int max_addr = mp_.map_voxel_num_(0) * mp_.map_voxel_num_(1) * mp_.map_voxel_num_(2);
+    for (int addr = 0; addr < max_addr - offset; addr++) {
+      md_.occupancy_buffer_inflate_[addr] = md_.occupancy_buffer_inflate_[addr + offset];
+      md_.occupancy_buffer_[addr] = md_.occupancy_buffer_[addr + offset];
+    }
+
+    if (move_offset.x() != 0) {
+      for (int addr = max_addr - offset; addr < max_addr; addr++) {
+        md_.occupancy_buffer_inflate_[addr] = 0;
+        md_.occupancy_buffer_[addr] = mp_.clamp_min_log_ - mp_.unknown_flag_;
+      }
+
+    } else if (move_offset.y() != 0) {
+      for (int i = 0; i < mp_.map_voxel_num_(0); i++) {
+        int part_max_addr = (i + 1) * mp_.map_voxel_num_(1) * mp_.map_voxel_num_(2);
+        for (int addr = part_max_addr - offset; addr < part_max_addr; addr++) {
+          md_.occupancy_buffer_inflate_[addr] = 0;
+          md_.occupancy_buffer_[addr] = mp_.clamp_min_log_ - mp_.unknown_flag_;
+        }
+      }
+
+    } else if (move_offset.z() != 0) { // TODO: fix some dust - inflate
+      for (int i = 0; i < mp_.map_voxel_num_(0); i++) {
+        for (int j = 0; j < mp_.map_voxel_num_(1); j++) {
+          int part_max_addr = i * mp_.map_voxel_num_(1) * mp_.map_voxel_num_(2) + (j + 1) * mp_.map_voxel_num_(2);
+          for (int addr = part_max_addr - offset; addr < part_max_addr; addr++) {
+            md_.occupancy_buffer_inflate_[addr] = 0;
+            md_.occupancy_buffer_[addr] = mp_.clamp_min_log_ - mp_.unknown_flag_;
+          }
+        }
+      }
+    }
+
+  } else if (offset < 0) {
+    int max_addr = mp_.map_voxel_num_(0) * mp_.map_voxel_num_(1) * mp_.map_voxel_num_(2);
+    for (int addr = max_addr - 1; addr >= -offset; addr--) {
+      md_.occupancy_buffer_inflate_[addr] = md_.occupancy_buffer_inflate_[addr + offset];
+      md_.occupancy_buffer_[addr] = md_.occupancy_buffer_[addr + offset];
+    }
+
+    if (move_offset.x() != 0) {
+      for (int addr = 0; addr < -offset; addr++) {
+        md_.occupancy_buffer_inflate_[addr] = 0;
+        md_.occupancy_buffer_[addr] = mp_.clamp_min_log_ - mp_.unknown_flag_;
+      }
+
+    } else if (move_offset.y() != 0) {
+      for (int i = 0; i < mp_.map_voxel_num_(0); i++) {
+        int part_max_addr = i * mp_.map_voxel_num_(1) * mp_.map_voxel_num_(2);
+        for (int addr = part_max_addr; addr < part_max_addr - offset; addr++) {
+          md_.occupancy_buffer_inflate_[addr] = 0;
+          md_.occupancy_buffer_[addr] = mp_.clamp_min_log_ - mp_.unknown_flag_;
+        }
+      }
+    } else if (move_offset.z() != 0) {
+      for (int i = 0; i < mp_.map_voxel_num_(0); i++) {
+        for (int j = 0; j < mp_.map_voxel_num_(1); j++) {
+          int part_max_addr = i * mp_.map_voxel_num_(1) * mp_.map_voxel_num_(2) + j * mp_.map_voxel_num_(2);
+          for (int addr = part_max_addr; addr < part_max_addr - offset; addr++) {
+            md_.occupancy_buffer_inflate_[addr] = 0;
+            md_.occupancy_buffer_[addr] = mp_.clamp_min_log_ - mp_.unknown_flag_;
+          }
+        }
+      }
+    }
+
+  } else return;
+
+  mp_.map_origin_ += move_offset;
+  mp_.map_min_boundary_ = mp_.map_origin_;
+  mp_.map_max_boundary_ = mp_.map_origin_ + mp_.map_size_;
 }
 
 int GridMap::setCacheOccupancy(Eigen::Vector3d pos, int occ)
@@ -435,7 +518,7 @@ void GridMap::raycastProcess()
   max_x = max(max_x, md_.camera_pos_(0));
   max_y = max(max_y, md_.camera_pos_(1));
   max_z = max(max_z, md_.camera_pos_(2));
-  max_z = max(max_z, mp_.ground_height_);
+  // max_z = max(max_z, mp_.ground_height_);
 
   posToIndex(Eigen::Vector3d(max_x, max_y, max_z), md_.local_bound_max_);
   posToIndex(Eigen::Vector3d(min_x, min_y, min_z), md_.local_bound_min_);
@@ -539,56 +622,56 @@ void GridMap::clearAndInflateLocalMap()
 
   // clear data outside the local range
 
-  for (int x = min_cut_m(0); x <= max_cut_m(0); ++x)
-    for (int y = min_cut_m(1); y <= max_cut_m(1); ++y)
-    {
+  // for (int x = min_cut_m(0); x <= max_cut_m(0); ++x)
+  //   for (int y = min_cut_m(1); y <= max_cut_m(1); ++y)
+  //   {
 
-      for (int z = min_cut_m(2); z < min_cut(2); ++z)
-      {
-        int idx = toAddress(x, y, z);
-        md_.occupancy_buffer_[idx] = mp_.clamp_min_log_ - mp_.unknown_flag_;
-      }
+  //     for (int z = min_cut_m(2); z < min_cut(2); ++z)
+  //     {
+  //       int idx = toAddress(x, y, z);
+  //       md_.occupancy_buffer_[idx] = mp_.clamp_min_log_ - mp_.unknown_flag_;
+  //     }
 
-      for (int z = max_cut(2) + 1; z <= max_cut_m(2); ++z)
-      {
-        int idx = toAddress(x, y, z);
-        md_.occupancy_buffer_[idx] = mp_.clamp_min_log_ - mp_.unknown_flag_;
-      }
-    }
+  //     for (int z = max_cut(2) + 1; z <= max_cut_m(2); ++z)
+  //     {
+  //       int idx = toAddress(x, y, z);
+  //       md_.occupancy_buffer_[idx] = mp_.clamp_min_log_ - mp_.unknown_flag_;
+  //     }
+  //   }
 
-  for (int z = min_cut_m(2); z <= max_cut_m(2); ++z)
-    for (int x = min_cut_m(0); x <= max_cut_m(0); ++x)
-    {
+  // for (int z = min_cut_m(2); z <= max_cut_m(2); ++z)
+  //   for (int x = min_cut_m(0); x <= max_cut_m(0); ++x)
+  //   {
 
-      for (int y = min_cut_m(1); y < min_cut(1); ++y)
-      {
-        int idx = toAddress(x, y, z);
-        md_.occupancy_buffer_[idx] = mp_.clamp_min_log_ - mp_.unknown_flag_;
-      }
+  //     for (int y = min_cut_m(1); y < min_cut(1); ++y)
+  //     {
+  //       int idx = toAddress(x, y, z);
+  //       md_.occupancy_buffer_[idx] = mp_.clamp_min_log_ - mp_.unknown_flag_;
+  //     }
 
-      for (int y = max_cut(1) + 1; y <= max_cut_m(1); ++y)
-      {
-        int idx = toAddress(x, y, z);
-        md_.occupancy_buffer_[idx] = mp_.clamp_min_log_ - mp_.unknown_flag_;
-      }
-    }
+  //     for (int y = max_cut(1) + 1; y <= max_cut_m(1); ++y)
+  //     {
+  //       int idx = toAddress(x, y, z);
+  //       md_.occupancy_buffer_[idx] = mp_.clamp_min_log_ - mp_.unknown_flag_;
+  //     }
+  //   }
 
-  for (int y = min_cut_m(1); y <= max_cut_m(1); ++y)
-    for (int z = min_cut_m(2); z <= max_cut_m(2); ++z)
-    {
+  // for (int y = min_cut_m(1); y <= max_cut_m(1); ++y)
+  //   for (int z = min_cut_m(2); z <= max_cut_m(2); ++z)
+  //   {
 
-      for (int x = min_cut_m(0); x < min_cut(0); ++x)
-      {
-        int idx = toAddress(x, y, z);
-        md_.occupancy_buffer_[idx] = mp_.clamp_min_log_ - mp_.unknown_flag_;
-      }
+  //     for (int x = min_cut_m(0); x < min_cut(0); ++x)
+  //     {
+  //       int idx = toAddress(x, y, z);
+  //       md_.occupancy_buffer_[idx] = mp_.clamp_min_log_ - mp_.unknown_flag_;
+  //     }
 
-      for (int x = max_cut(0) + 1; x <= max_cut_m(0); ++x)
-      {
-        int idx = toAddress(x, y, z);
-        md_.occupancy_buffer_[idx] = mp_.clamp_min_log_ - mp_.unknown_flag_;
-      }
-    }
+  //     for (int x = max_cut(0) + 1; x <= max_cut_m(0); ++x)
+  //     {
+  //       int idx = toAddress(x, y, z);
+  //       md_.occupancy_buffer_[idx] = mp_.clamp_min_log_ - mp_.unknown_flag_;
+  //     }
+  //   }
 
   // inflate occupied voxels to compensate robot size
 
@@ -599,19 +682,18 @@ void GridMap::clearAndInflateLocalMap()
   Eigen::Vector3i inf_pt;
 
   // clear outdated data
-  for (int x = md_.local_bound_min_(0); x <= md_.local_bound_max_(0); ++x)
-    for (int y = md_.local_bound_min_(1); y <= md_.local_bound_max_(1); ++y)
-      for (int z = md_.local_bound_min_(2); z <= md_.local_bound_max_(2); ++z)
+  for (int x = min_cut_m(0) + inf_step; x <= max_cut_m(0) - inf_step; ++x)
+    for (int y = min_cut_m(1) + inf_step; y <= max_cut_m(1) - inf_step; ++y)
+      for (int z = min_cut_m(2) + inf_step; z <= max_cut_m(2) - inf_step; ++z)
       {
         md_.occupancy_buffer_inflate_[toAddress(x, y, z)] = 0;
       }
 
   // inflate obstacles
-  for (int x = md_.local_bound_min_(0); x <= md_.local_bound_max_(0); ++x)
-    for (int y = md_.local_bound_min_(1); y <= md_.local_bound_max_(1); ++y)
-      for (int z = md_.local_bound_min_(2); z <= md_.local_bound_max_(2); ++z)
+  for (int x = min_cut_m(0) + inf_step; x <= max_cut_m(0) - inf_step; ++x)
+    for (int y = min_cut_m(1) + inf_step; y <= max_cut_m(1) - inf_step; ++y)
+      for (int z = min_cut_m(2) + inf_step; z <= max_cut_m(2) - inf_step; ++z)
       {
-
         if (md_.occupancy_buffer_[toAddress(x, y, z)] > mp_.min_occupancy_log_)
         {
           inflatePoint(Eigen::Vector3i(x, y, z), inf_step, inf_pts);
@@ -629,17 +711,6 @@ void GridMap::clearAndInflateLocalMap()
           }
         }
       }
-
-  // add virtual ceiling to limit flight height
-  if (mp_.virtual_ceil_height_ > -0.5)
-  {
-    int ceil_id = floor((mp_.virtual_ceil_height_ - mp_.map_origin_(2)) * mp_.resolution_inv_);
-    for (int x = md_.local_bound_min_(0); x <= md_.local_bound_max_(0); ++x)
-      for (int y = md_.local_bound_min_(1); y <= md_.local_bound_max_(1); ++y)
-      {
-        md_.occupancy_buffer_inflate_[toAddress(x, y, ceil_id)] = 1;
-      }
-  }
 }
 
 void GridMap::visCallback(const ros::TimerEvent & /*event*/)
@@ -722,8 +793,28 @@ void GridMap::odomCallback(const nav_msgs::OdometryConstPtr &odom)
   md_.camera_pos_(0) = odom->pose.pose.position.x;
   md_.camera_pos_(1) = odom->pose.pose.position.y;
   md_.camera_pos_(2) = odom->pose.pose.position.z;
+  md_.camera_q_ = Eigen::Quaterniond(odom->pose.pose.orientation.w, odom->pose.pose.orientation.x,
+                                     odom->pose.pose.orientation.y, odom->pose.pose.orientation.z);
 
   md_.has_odom_ = true;
+
+  Eigen::Vector3d change_unit(10, 10, 2.5);
+  Eigen::Vector3d test_orig = mp_.map_origin_ +  mp_.map_size_ / 2.0;
+  Eigen::Vector3d test_new = md_.camera_pos_;
+  Eigen::Vector3i test_res((int)round((test_new.x() - test_orig.x()) / change_unit.x()),
+                           (int)round((test_new.y() - test_orig.y()) / change_unit.y()),
+                           (int)round((test_new.z() - test_orig.z()) / change_unit.z()));
+
+  if (abs(test_new.x() - test_orig.x()) > change_unit.x() * 2.0 / 3.0) {
+    // std::cout << "change_origin - X direction" << std::endl;
+    change_origin({(double)test_res.x() * change_unit.x(), 0, 0});
+  } else if (abs(test_new.y() - test_orig.y()) > change_unit.y() * 2.0 / 3.0) {
+    // std::cout << "change_origin - Y direction" << std::endl;
+    change_origin({0, (double)test_res.y() * change_unit.y(), 0});
+  } else if (abs(test_new.z() - test_orig.z()) > change_unit.z() * 2.0 / 3.0) {
+    // std::cout << "change_origin - Z direction" << std::endl;
+    change_origin({0, 0, (double)test_res.z() * change_unit.z()});
+  }
 }
 
 void GridMap::cloudCallback(const sensor_msgs::PointCloud2ConstPtr &img)
@@ -755,18 +846,22 @@ void GridMap::cloudCallback(const sensor_msgs::PointCloud2ConstPtr &img)
   pcl::PointXYZ pt;
   Eigen::Vector3d p3d, p3d_inf;
 
-  // int inf_step = ceil(mp_.obstacles_inflation_ / mp_.resolution_);
-  // int inf_step_z = 1;
+  bool convert_camera_frame = true;
+  if (convert_camera_frame) {
+    Eigen::Matrix3d camera_r = md_.camera_q_.toRotationMatrix();
 
-  // double max_x, max_y, max_z, min_x, min_y, min_z;
+    for (size_t i = 0; i < latest_cloud.points.size(); ++i)
+    {
+      pt = latest_cloud.points[i];
+      if (isnan(pt.x) || isnan(pt.y) || isnan(pt.z)) continue;
+      p3d(0) = pt.z, p3d(1) = -pt.x, p3d(2) = -pt.y;
+      p3d = camera_r * p3d + md_.camera_pos_;
+      md_.proj_points_.push_back(p3d);
+      md_.proj_points_cnt++;
+    }
 
-  // min_x = mp_.map_max_boundary_(0);
-  // min_y = mp_.map_max_boundary_(1);
-  // min_z = mp_.map_max_boundary_(2);
-
-  // max_x = mp_.map_min_boundary_(0);
-  // max_y = mp_.map_min_boundary_(1);
-  // max_z = mp_.map_min_boundary_(2);
+    return;
+  }
 
   for (size_t i = 0; i < latest_cloud.points.size(); ++i)
   {
@@ -774,60 +869,7 @@ void GridMap::cloudCallback(const sensor_msgs::PointCloud2ConstPtr &img)
     p3d(0) = pt.x, p3d(1) = pt.y, p3d(2) = pt.z;
     md_.proj_points_.push_back(p3d);
     md_.proj_points_cnt++;
-
-  //   /* point inside update range */
-  //   Eigen::Vector3d devi = p3d - md_.camera_pos_;
-  //   Eigen::Vector3i inf_pt;
-
-  //   if (fabs(devi(0)) < mp_.local_update_range_(0) && fabs(devi(1)) < mp_.local_update_range_(1) &&
-  //       fabs(devi(2)) < mp_.local_update_range_(2))
-  //   {
-
-  //     /* inflate the point */
-  //     for (int x = -inf_step; x <= inf_step; ++x)
-  //       for (int y = -inf_step; y <= inf_step; ++y)
-  //         for (int z = -inf_step_z; z <= inf_step_z; ++z)
-  //         {
-
-  //           p3d_inf(0) = pt.x + x * mp_.resolution_;
-  //           p3d_inf(1) = pt.y + y * mp_.resolution_;
-  //           p3d_inf(2) = pt.z + z * mp_.resolution_;
-
-  //           max_x = max(max_x, p3d_inf(0));
-  //           max_y = max(max_y, p3d_inf(1));
-  //           max_z = max(max_z, p3d_inf(2));
-
-  //           min_x = min(min_x, p3d_inf(0));
-  //           min_y = min(min_y, p3d_inf(1));
-  //           min_z = min(min_z, p3d_inf(2));
-
-  //           posToIndex(p3d_inf, inf_pt);
-
-  //           if (!isInMap(inf_pt))
-  //             continue;
-
-  //           int idx_inf = toAddress(inf_pt);
-
-  //           md_.occupancy_buffer_inflate_[idx_inf] = 1;
-  //         }
-  //   }
   }
-
-  // min_x = min(min_x, md_.camera_pos_(0));
-  // min_y = min(min_y, md_.camera_pos_(1));
-  // min_z = min(min_z, md_.camera_pos_(2));
-
-  // max_x = max(max_x, md_.camera_pos_(0));
-  // max_y = max(max_y, md_.camera_pos_(1));
-  // max_z = max(max_z, md_.camera_pos_(2));
-
-  // max_z = max(max_z, mp_.ground_height_);
-
-  // posToIndex(Eigen::Vector3d(max_x, max_y, max_z), md_.local_bound_max_);
-  // posToIndex(Eigen::Vector3d(min_x, min_y, min_z), md_.local_bound_min_);
-
-  // boundIndex(md_.local_bound_min_);
-  // boundIndex(md_.local_bound_max_);
 }
 
 void GridMap::publishMap()
@@ -895,6 +937,9 @@ void GridMap::publishMapInflate(bool all_info)
     max_cut += Eigen::Vector3i(lmm, lmm, lmm);
   }
 
+  // min_cut = Eigen::Vector3i(0, 0, 0);
+  // max_cut = mp_.map_voxel_num_ - Eigen::Vector3i::Ones();
+
   boundIndex(min_cut);
   boundIndex(max_cut);
 
@@ -907,8 +952,8 @@ void GridMap::publishMapInflate(bool all_info)
 
         Eigen::Vector3d pos;
         indexToPos(Eigen::Vector3i(x, y, z), pos);
-        if (pos(2) > mp_.visualization_truncate_height_)
-          continue;
+        // if (pos(2) > mp_.visualization_truncate_height_)
+        //   continue;
 
         pt.x = pos(0);
         pt.y = pos(1);

@@ -23,7 +23,6 @@ Panels:
   - Class: rviz/Views
     Expanded:
       - /Current View1
-      - /ThirdPersonFollower1
     Name: Views
     Splitter Ratio: 0.5
   - Class: rviz/Time
@@ -179,8 +178,8 @@ Visualization Manager:
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 2.940000057220459
-            Min Value: -0.05999999865889549
+            Max Value: 4.949999809265137
+            Min Value: -0.75
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -260,7 +259,7 @@ Visualization Manager:
       Value: false
     - Class: rviz/Image
       Enabled: true
-      Image Topic: /camera/rgb/image_raw
+      Image Topic: /stereo/left/image_raw
       Max Value: 1
       Median window: 5
       Min Value: 0
@@ -346,46 +345,26 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 31.72223663330078
+      Distance: 20
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 1.7745718955993652
-        Y: -13.320341110229492
-        Z: -1.286300175706856e-6
+        X: 0
+        Y: 0
+        Z: 0
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.9397974014282227
-      Target Frame: base
+      Pitch: 0.11999999731779099
+      Target Frame: base_link
       Value: ThirdPersonFollower (rviz)
-      Yaw: 4.718601226806641
-    Saved:
-      - Class: rviz/ThirdPersonFollower
-        Distance: 17.48538589477539
-        Enable Stereo Rendering:
-          Stereo Eye Separation: 0.05999999865889549
-          Stereo Focal Distance: 1
-          Swap Stereo Eyes: false
-          Value: false
-        Focal Point:
-          X: 0
-          Y: 0
-          Z: 0
-        Focal Shape Fixed Size: true
-        Focal Shape Size: 0.05000000074505806
-        Invert Z Axis: false
-        Name: ThirdPersonFollower
-        Near Clip Distance: 0.009999999776482582
-        Pitch: 1.0347968339920044
-        Target Frame: <Fixed Frame>
-        Value: ThirdPersonFollower (rviz)
-        Yaw: 3.150407314300537
+      Yaw: 3.1414999961853027
+    Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
